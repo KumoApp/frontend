@@ -56,6 +56,7 @@ export interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (username: string, password: string) => Promise<boolean>;
+  demoLogin: (userType: 'student' | 'teacher') => boolean;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;

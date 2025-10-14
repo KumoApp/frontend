@@ -12,7 +12,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onBack }: LoginFormProps) {
-  const { login, isLoading } = useAuth();
+  const { login, demoLogin, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -34,9 +34,10 @@ export function LoginForm({ onBack }: LoginFormProps) {
     }
   };
 
-  const handleDemoLogin = async (username: string, password: string) => {
+  const handleDemoLogin = (userType: 'student' | 'teacher') => {
     setError('');
-    const success = await login(username, password);
+    
+    const success = demoLogin(userType);
     
     if (!success) {
       setError('Error en el login de demostración');
@@ -59,8 +60,12 @@ export function LoginForm({ onBack }: LoginFormProps) {
         <Card className="bg-white/95 backdrop-blur shadow-2xl">
           <CardHeader className="space-y-4">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
-                <span className="text-2xl">🐱</span>
+              <div className="inline-flex items-center justify-center mb-4">
+                <img 
+                  src="/src/assets/kumo_logo.svg" 
+                  alt="Kumo Logo" 
+                  className="h-12 w-auto"
+                />
               </div>
               <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
               <p className="text-gray-600 mt-2">Accede a tu cuenta de Kumo</p>
@@ -141,7 +146,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => handleDemoLogin('estudiante1', 'password123')}
+                onClick={() => handleDemoLogin('student')}
                 disabled={isLoading}
               >
                 <BookOpen className="h-4 w-4 mr-2" />
@@ -151,7 +156,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => handleDemoLogin('profesor1', 'password123')}
+                onClick={() => handleDemoLogin('teacher')}
                 disabled={isLoading}
               >
                 <Users className="h-4 w-4 mr-2" />

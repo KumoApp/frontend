@@ -85,12 +85,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user_data');
   };
 
+  const demoLogin = (userType: 'student' | 'teacher'): boolean => {
+    try {
+      // Crear datos de usuario demo
+      const demoUsers = {
+        student: {
+          id: 1,
+          email: 'estudiante1@demo.com',
+          name: 'Ana',
+          lastname: 'García',
+          username: 'estudiante1',
+          role: Role.STUDENT
+        },
+        teacher: {
+          id: 2,
+          email: 'profesor1@demo.com',
+          name: 'Dr. Carlos',
+          lastname: 'Mendoza',
+          username: 'profesor1',
+          role: Role.TEACHER
+        }
+      };
+
+      const demoUser = demoUsers[userType];
+      const demoToken = 'demo-token-' + userType;
+      
+      // Simular login exitoso
+      setUser(demoUser);
+      setToken(demoToken);
+      localStorage.setItem('auth_token', demoToken);
+      localStorage.setItem('user_data', JSON.stringify(demoUser));
+      
+      return true;
+    } catch (error) {
+      console.error('Error en login demo:', error);
+      return false;
+    }
+  };
+
   const isAuthenticated = user !== null && token !== null;
 
   const value: AuthContextType = {
     user,
     token,
     login,
+    demoLogin,
     logout,
     isLoading,
     isAuthenticated,
