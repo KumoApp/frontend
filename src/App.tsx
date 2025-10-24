@@ -12,6 +12,7 @@ type AppState = 'landing' | 'login';
 
 function AppContent() {
   const { user, logout, isLoading } = useAuth();
+  console.log('AppContent user:', user);
   const [currentView, setCurrentView] = useState<AppState>('landing');
 
   const handleLogout = () => {

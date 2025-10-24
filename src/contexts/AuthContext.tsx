@@ -2,6 +2,20 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, AuthContextType, Role } from '../types/auth';
 import { authService } from '../services/api';
 
+/** Errores específicos exportados para que los llamadores (LoginForm) los capturen */
+export class InvalidCredentialsError extends Error {
+  constructor(message = 'Usuario o contraseña inválidos') {
+    super(message);
+    this.name = 'InvalidCredentialsError';
+  }
+}
+export class TokenInvalidError extends Error {
+  constructor(message = 'Token inválido o expirado') {
+    super(message);
+    this.name = 'TokenInvalidError';
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
@@ -46,33 +60,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
   }, []);
 
+  /**
+   * login:
+   * - Si la API responde que las credenciales son inválidas -> lanza InvalidCredentialsError
+   * - Si el token devuelto no es válido -> lanza TokenInvalidError
+   * - Si hay un error de red u otro -> relanza para que el caller lo maneje
+   */
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
       const response = await authService.login({ username, password });
-      
-      if (response.body?.success && response.body?.token) {
-        // Obtener información del usuario del token
-        const tokenResponse = await authService.checkToken(response.body.token);
-        
-        if (tokenResponse.body?.valid && tokenResponse.body?.payload) {
-          const userData = tokenResponse.body.payload as User;
-          
-          // Guardar en estado y localStorage
-          setToken(response.body.token);
-          setUser(userData);
-          localStorage.setItem('auth_token', response.body.token);
-          localStorage.setItem('user_data', JSON.stringify(userData));
-          
-          return true;
-        }
+
+      // Si la API indica fallo (credenciales incorrectas), lanzamos excepción
+      if (!response.body?.success || !response.body?.token) {
+        throw new InvalidCredentialsError();
       }
-      
-      return false;
+
+      // Verificamos el token para obtener payload/user
+      const tokenResponse = await authService.checkToken(response.body.token);
+
+      if (!(tokenResponse.body?.valid && tokenResponse.body?.payload)) {
+        throw new TokenInvalidError();
+      }
+
+      const userData = tokenResponse.body.payload as User;
+
+      // Guardar en estado y localStorage
+      setToken(response.body.token);
+      setUser(userData);
+      console.log('AuthProvider - userData from token:', userData);
+      localStorage.setItem('auth_token', response.body.token);
+      localStorage.setItem('user_data', JSON.stringify(userData));
+
+      return true;
     } catch (error) {
+      // No tragamos el error: lo re-lanzamos para que el caller (LoginForm) lo maneje
       console.error('Error en login:', error);
-      return false;
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -149,4 +174,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
