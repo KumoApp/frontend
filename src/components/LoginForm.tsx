@@ -1,4 +1,3 @@
-// src/components/LoginForm.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -35,15 +34,25 @@ export function LoginForm({ onBack }: LoginFormProps) {
       // caso en que login devuelva false en vez de lanzar excepción
       if (result === false) {
         setPassword('');
-        setError('error contraseña o usuario mal');
+        setError('Usuario o contraseña incorrectos');
+        (document.getElementById('username') as HTMLInputElement | null)?.focus();
       }
       // si login fue exitoso, el contexto actualizará la UI
     } catch (err: any) {
-      // errores específicos
-      if (err instanceof InvalidCredentialsError || err instanceof TokenInvalidError || err?.response?.status === 401) {
+      // detectar credenciales inválidas de forma robusta
+      const isInvalidCreds =
+        err instanceof InvalidCredentialsError ||
+        err instanceof TokenInvalidError && err.name === 'InvalidCredentialsError' ||
+        err?.name === 'InvalidCredentialsError' ||
+        (typeof err?.message === 'string' && /usuario|contraseña|credencial|invalid/i.test(err.message)) ||
+        err?.response?.status === 401;
+
+      if (isInvalidCreds) {
         setPassword('');
-        setError('error contraseña o usuario mal');
+        setError('Usuario o contraseña incorrectos');
+        (document.getElementById('username') as HTMLInputElement | null)?.focus();
       } else {
+        console.error('Login error:', err);
         setError('Error del servidor. Intenta nuevamente más tarde.');
       }
     }

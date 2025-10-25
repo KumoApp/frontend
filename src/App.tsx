@@ -21,9 +21,7 @@ function AppContent() {
   };
 
   // Si está cargando, mostrar spinner
-  if (isLoading) {
-    return <LoadingSpinner message="Verificando autenticación..." />;
-  }
+  
 
   // Si el usuario está autenticado, mostrar el dashboard correspondiente
   if (user) {
