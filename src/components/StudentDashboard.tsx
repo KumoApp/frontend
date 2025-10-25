@@ -152,11 +152,12 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
           <Card className="bg-white/90 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div 
-                className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: studentData.petColor }}
-              >
-                <span className="text-white text-xl">🐱</span>
+              <div className="mx-auto mb-2 flex items-center justify-center">
+                <img 
+                  src="/src/assets/kumo_logo.svg" 
+                  alt="Kumo Pet" 
+                  className="h-8 w-auto"
+                />
               </div>
               <p className="text-sm font-medium">{studentData.petName}</p>
               <p className="text-xs text-gray-600">Tu mascota</p>

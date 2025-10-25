@@ -205,11 +205,12 @@ export function ClassroomPets({ onBack }: ClassroomPetsProps) {
                 {filteredPets.slice(0, 3).map((pet, index) => (
                   <div key={pet.id} className="text-center">
                     <div className="relative mb-2">
-                      <div
-                        className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto border-4 border-white shadow-lg"
-                        style={{ backgroundColor: pet.petColor }}
-                      >
-                        🐱
+                      <div className="flex items-center justify-center mx-auto">
+                        <img 
+                          src="/src/assets/kumo_logo.svg" 
+                          alt="Kumo Pet" 
+                          className="h-10 w-auto"
+                        />
                       </div>
                       <div className="absolute -top-2 -right-2">
                         {getRankIcon(pet.rank)}
@@ -256,11 +257,12 @@ export function ClassroomPets({ onBack }: ClassroomPetsProps) {
 
                 <div className="text-center mb-3">
                   <div className="relative mx-auto mb-2">
-                    <div
-                      className="w-20 h-20 rounded-full flex items-center justify-center text-3xl mx-auto border-3 border-white shadow-md"
-                      style={{ backgroundColor: pet.petColor }}
-                    >
-                      🐱
+                    <div className="flex items-center justify-center mx-auto">
+                      <img 
+                        src="/src/assets/kumo_logo.svg" 
+                        alt="Kumo Pet" 
+                        className="h-12 w-auto"
+                      />
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="flex flex-wrap gap-1 justify-center">

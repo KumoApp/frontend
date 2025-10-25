@@ -243,8 +243,12 @@ export function TeacherDashboard({ teacherData, onLogout }: TeacherDashboardProp
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-xl">🐱</span>
+                <div className="flex items-center justify-center">
+                  <img 
+                    src="/src/assets/kumo_logo.svg" 
+                    alt="Kumo Logo" 
+                    className="h-8 w-auto"
+                  />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold">Panel de Profesor</h1>

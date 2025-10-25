@@ -208,11 +208,12 @@ export function PetCustomization({ onBack, studentData, onCustomize }: PetCustom
             </CardHeader>
             <CardContent className="text-center">
               <div className="relative mx-auto mb-4 w-32 h-32">
-                <div
-                  className="w-32 h-32 rounded-full flex items-center justify-center text-6xl border-4 border-white shadow-lg"
-                  style={{ backgroundColor: selectedColor }}
-                >
-                  🐱
+                <div className="flex items-center justify-center">
+                  <img 
+                    src="/src/assets/kumo_logo.svg" 
+                    alt="Kumo Pet" 
+                    className="h-20 w-auto"
+                  />
                 </div>
                 {/* Accessories overlay */}
                 {selectedAccessories.map((accessory) => {
