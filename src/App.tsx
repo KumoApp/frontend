@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Role } from './types/auth';
+import { AdminDashboard } from './components/AdminDashboard';
 
 type AppState = 'landing' | 'login';
 
@@ -54,18 +55,7 @@ function AppContent() {
     } else if (user.role === Role.ADMIN) {
       return (
         <ProtectedRoute allowedRoles={[Role.ADMIN]}>
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold mb-4">Panel de Administración</h1>
-              <p className="text-gray-600 mb-4">Bienvenido, {user.name}</p>
-              <button 
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
+          <AdminDashboard />
         </ProtectedRoute>
       );
     }
