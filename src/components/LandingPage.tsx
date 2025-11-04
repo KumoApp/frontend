@@ -49,12 +49,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <div className="text-center">
             {/* Logo/Brand */}
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center mb-6">
-                <img 
-                  src="/src/assets/kumo_logo.svg" 
-                  alt="Kumo Logo" 
-                  className="h-16 w-auto"
-                />
+              <div className="inline-flex items-center justify-center w-24 h-24 bg-primary rounded-3xl mb-6 shadow-2xl">
+                <span className="text-4xl">🐱</span>
               </div>
               <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
                 Kumo
@@ -70,7 +66,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                 Aprende de manera divertida con 
                 <span className="font-semibold text-primary"> quizzes gamificados</span>, 
                 <span className="font-semibold text-secondary"> mascotas virtuales</span> y 
-                <span className="font-semibold text-accent-foreground"> un chatbot inteligente </span> 
+                <span className="font-semibold text-accent-foreground"> un chatbot inteligente</span> 
                 que te ayuda a entender mejor tus clases. ¡Gana KumoSoles y mantén tu racha!
               </p>
             </div>
