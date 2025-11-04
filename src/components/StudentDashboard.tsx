@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MessageCircle, BookOpen, Trophy, Sparkles, Users, Gift, History } from 'lucide-react';
+
 import { ChatBot } from './ChatBot';
 import { QuizModal } from './QuizModal';
 import { PetCustomization } from './PetCustomization';
@@ -12,7 +13,14 @@ import { ClassroomPets } from './ClassroomPets';
 import { ProfileDropdown } from './ProfileDropdown';
 import { QuizHistory } from './QuizHistory';
 import { useAuth } from '../contexts/AuthContext';
-import type { ClassInfo } from './ChatBot';
+
+export interface ClassInfo {
+  id: string;
+  name: string;
+  subject?: string;
+  teacher?: string;
+  color: string;
+}
 
 interface StudentData {
   name: string;
@@ -49,6 +57,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   const { token } = useAuth();
 
   const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'quiz' | 'customize' | 'classroom' | 'history'>('dashboard');
+
   const [studentData, setStudentData] = useState<StudentData>({
     name: userData?.name || 'Estudiante',
     kumoSoles: 1250,
@@ -66,7 +75,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
   const headers = useMemo(
     () => ({
-      Authorization: `Bearer ${token}`,    // Token del estudiante
+      Authorization: `Bearer ${token}`, // Token del estudiante
       'Content-Type': 'application/json'
     }),
     [token]
@@ -152,6 +161,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
     }));
   };
 
+  // Vistas secundarias
   if (activeView === 'chat') {
     if (!selectedClass) {
       return (
@@ -192,9 +202,17 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   }
 
   if (activeView === 'history') {
-    return <QuizHistory onBack={() => setActiveView('dashboard')} />;
-  }
+  return (
+    <QuizHistory
+      onBack={() => setActiveView('dashboard')}
+      classId={selectedClass?.id ?? ''}         // <- toma el ID del selector
+      studentName={studentData.name}
+    />
+  );
+}
 
+
+  // Vista principal (dashboard)
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
       <div className="max-w-6xl mx-auto">
@@ -291,12 +309,29 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-          <Button onClick={() => setActiveView('chat')} className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90" disabled={!selectedClass}>
+          <Button
+            onClick={() => setActiveView('chat')}
+            className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90"
+            disabled={!selectedClass}
+            title={!selectedClass ? 'Selecciona una clase primero' : 'Abrir chat'}
+          >
             <MessageCircle className="h-8 w-8" />
             <span>Pregunta al Chat</span>
           </Button>
 
-          <Button onClick={() => setActiveView('quiz')} variant="secondary" className="h-24 flex flex-col gap-2">
+          <Button
+            onClick={() => {
+              if (!selectedClass) {
+                alert('Primero selecciona una clase en el selector superior.');
+                return;
+              }
+              setActiveView('quiz');
+            }}
+            variant="secondary"
+            className="h-24 flex flex-col gap-2"
+            disabled={!selectedClass}
+            title={!selectedClass ? 'Selecciona una clase primero' : 'Abrir quiz diario'}
+          >
             <BookOpen className="h-8 w-8" />
             <span>Quiz Diario</span>
           </Button>
@@ -345,8 +380,15 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           </CardContent>
         </Card>
 
-        {activeView === 'quiz' && (
-          <QuizModal onClose={() => setActiveView('dashboard')} onComplete={handleQuizComplete} streakMultiplier={streakMultiplier} />
+        {/* Modal del Quiz Diario (pasa classId desde el selector superior) */}
+        {activeView === 'quiz' && selectedClass && (
+          <QuizModal
+            classId={selectedClass.id}      // <- AQUÍ se cablea el ID del selector superior
+            onClose={() => setActiveView('dashboard')}
+            onComplete={handleQuizComplete}
+            streakMultiplier={streakMultiplier}
+            baseUrl={BASE}
+          />
         )}
 
         {classesError && (

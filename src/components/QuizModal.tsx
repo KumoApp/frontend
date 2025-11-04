@@ -1,185 +1,313 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
-import { X, Clock, Trophy, Sparkles } from 'lucide-react';
+import { X, Trophy, Sparkles } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation: string;
-}
+const DEFAULT_BASE = 'http://localhost:3000';
+
+type DailyQuizAPI = {
+  code: number;
+  message: string;
+  body: {
+    id: number;
+    totalQuestions: number;
+    date: string;
+    questions: Array<{
+      id: number;
+      questionNumber: number;
+      content: string;
+      optionA: string;
+      optionB: string;
+      optionC: string;
+      optionD: string;
+    }>;
+  };
+};
+
+type SubmitDailyResp =
+  | { code: number; message: string; body?: { score?: number; correctCount?: number; total?: number } }
+  | any;
 
 interface QuizModalProps {
+  classId: string | number;
   onClose: () => void;
   onComplete: (score: number) => void;
   streakMultiplier: number;
+  baseUrl?: string;
 }
 
-export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalProps) {
+export function QuizModal({
+  classId,
+  onClose,
+  onComplete,
+  streakMultiplier,
+  baseUrl = DEFAULT_BASE,
+}: QuizModalProps) {
+  const { token } = useAuth();
+  const headers = useMemo(
+    () => ({
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    }),
+    [token]
+  );
+
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [questions, setQuestions] = useState<
+    Array<{ id: number; questionNumber: number; content: string; options: string[] }>
+  >([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
+  const [selectedAnswers, setSelectedAnswers] = useState<Array<number | undefined>>([]);
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
-  // Mock quiz questions
-  const questions: Question[] = [
-    {
-      id: '1',
-      question: '¿Cuál es la fórmula para resolver una ecuación de segundo grado?',
-      options: [
-        'x = -b ± √(b² - 4ac) / 2a',
-        'x = -b ± √(b² + 4ac) / 2a',
-        'x = b ± √(b² - 4ac) / 2a',
-        'x = -b ± √(b² - 4ac) / a'
-      ],
-      correctAnswer: 0,
-      explanation: 'La fórmula cuadrática es x = -b ± √(b² - 4ac) / 2a, donde a, b y c son los coeficientes de la ecuación ax² + bx + c = 0.'
-    },
-    {
-      id: '2',
-      question: '¿En qué año comenzó la Segunda Guerra Mundial?',
-      options: ['1938', '1939', '1940', '1941'],
-      correctAnswer: 1,
-      explanation: 'La Segunda Guerra Mundial comenzó el 1 de septiembre de 1939 con la invasión alemana de Polonia.'
-    },
-    {
-      id: '3',
-      question: '¿Cuál es el planeta más grande del sistema solar?',
-      options: ['Saturno', 'Neptuno', 'Júpiter', 'Urano'],
-      correctAnswer: 2,
-      explanation: 'Júpiter es el planeta más grande del sistema solar, con una masa mayor que todos los demás planetas combinados.'
-    },
-    {
-      id: '4',
-      question: '¿Quién escribió "Don Quijote de la Mancha"?',
-      options: ['Lope de Vega', 'Miguel de Cervantes', 'Francisco de Quevedo', 'Calderón de la Barca'],
-      correctAnswer: 1,
-      explanation: 'Miguel de Cervantes Saavedra escribió "Don Quijote de la Mancha", considerada una de las obras más importantes de la literatura española.'
-    },
-    {
-      id: '5',
-      question: '¿Cuál es el símbolo químico del oro?',
-      options: ['Go', 'Au', 'Ag', 'Or'],
-      correctAnswer: 1,
-      explanation: 'El símbolo químico del oro es Au, que proviene del latín "aurum".'
-    }
-  ];
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // === Cargar quiz diario ===
   useEffect(() => {
-    if (timeLeft > 0 && !showResults) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0) {
-      handleFinishQuiz();
-    }
-  }, [timeLeft, showResults]);
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
-  const handleAnswerSelect = (answerIndex: number) => {
-    const newAnswers = [...selectedAnswers];
-    newAnswers[currentQuestion] = answerIndex;
-    setSelectedAnswers(newAnswers);
+    async function loadDaily() {
+      if (!token) {
+        setLoadError('No hay sesión activa (token). Inicia sesión para cargar el quiz.');
+        setLoading(false);
+        return;
+      }
+      if (classId === undefined || classId === null || classId === '') {
+        setLoadError('classId inválido o no provisto.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setLoadError(null);
+
+        const url = `${baseUrl}/quizzes/classes/${classId}/daily`;
+        const resp = await fetch(url, { headers, signal: controller.signal });
+
+        if (!resp.ok) {
+          let detail = '';
+          try {
+            const j = await resp.json();
+            detail = j?.message || j?.error || '';
+          } catch {}
+          throw new Error(`GET /daily → HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
+        }
+
+        const json: DailyQuizAPI = await resp.json();
+        const b = json?.body;
+
+        if (!b || !Array.isArray(b.questions)) {
+          throw new Error('Respuesta inesperada del backend: faltan preguntas.');
+        }
+
+        const mapped = b.questions
+          .slice()
+          .sort((a, b) => a.questionNumber - b.questionNumber)
+          .map((q) => ({
+            id: q.id,
+            questionNumber: q.questionNumber,
+            content: q.content,
+            options: [q.optionA, q.optionB, q.optionC, q.optionD],
+          }));
+
+        if (!cancelled) {
+          setQuestions(mapped);
+          setSelectedAnswers(Array(mapped.length).fill(undefined));
+          setCurrentQuestion(0);
+          setSubmitError(null);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          if (e?.name === 'AbortError') {
+            setLoadError('La solicitud tardó demasiado (timeout). Verifica el backend o la red.');
+          } else {
+            setLoadError(e?.message || 'No se pudo cargar el quiz diario.');
+          }
+          console.error('Error getdailyquiz:', e);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+        clearTimeout(timeout);
+      }
+    }
+
+    loadDaily();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [headers, token, classId, baseUrl]);
+
+  const handleAnswerSelect = (optionIndex: number) => {
+    setSelectedAnswers((prev) => {
+      const copy = [...prev];
+      copy[currentQuestion] = optionIndex; // 0..3
+      return copy;
+    });
+    setSubmitError(null);
   };
 
   const handleNextQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    } else {
-      handleFinishQuiz();
-    }
+    if (selectedAnswers[currentQuestion] === undefined) return;
+    if (currentQuestion < questions.length - 1) setCurrentQuestion((q) => q + 1);
+    else void handleFinishQuiz();
   };
 
-  const handleFinishQuiz = () => {
-    let correctAnswers = 0;
-    selectedAnswers.forEach((answer, index) => {
-      if (answer === questions[index]?.correctAnswer) {
-        correctAnswers++;
-      }
-    });
+  const handleFinishQuiz = async () => {
+    setSubmitError(null);
 
-    const finalScore = Math.round((correctAnswers / questions.length) * 100);
+    // Verifica que todas estén respondidas (para no mandar undefined)
+    const firstUnanswered = selectedAnswers.findIndex((a) => a === undefined);
+    if (firstUnanswered !== -1) {
+      setCurrentQuestion(firstUnanswered);
+      setSubmitError('Responde todas las preguntas antes de enviar.');
+      return;
+    }
+
+    // === Payload EXACTO que pide tu backend ===
+    // { "answers": [0, 2, 1, ...] }
+    const answersArray = (selectedAnswers as number[]).map((a) => Number(a));
+    const payload = { answers: answersArray };
+
+    let finalScore = 0;
+
+    try {
+      const resp = await fetch(`${baseUrl}/quizzes/classes/${classId}/daily/answer`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        let detailMsg = `HTTP ${resp.status} ${resp.statusText}`;
+        try {
+          const txt = await resp.text();
+          try {
+            const j = JSON.parse(txt);
+            detailMsg = j?.message || j?.error || detailMsg;
+          } catch {
+            if (txt) detailMsg = `${detailMsg} - ${txt}`;
+          }
+        } catch {}
+        setSubmitError(`No se pudo enviar tus respuestas: ${detailMsg}`);
+        // Proxy: porcentaje contestadas (aquí deberían ser todas, así que 100)
+        finalScore = Math.round((answersArray.length / Math.max(1, questions.length)) * 100);
+        setScore(finalScore);
+        setShowResults(true);
+        return;
+      }
+
+      // OK: intenta leer el resultado (score/correctCount/total)
+      let data: SubmitDailyResp | null = null;
+      try {
+        data = await resp.json();
+      } catch {
+        data = null;
+      }
+
+      const s = data?.body?.score;
+      if (typeof s === 'number' && !Number.isNaN(s)) {
+        finalScore = Math.max(0, Math.min(100, Math.round(s)));
+      } else if (data?.body?.correctCount != null && data?.body?.total != null) {
+        finalScore = Math.round((data.body.correctCount / Math.max(1, data.body.total)) * 100);
+      } else {
+        // si no hay score, asume 100% contestadas
+        finalScore = 100;
+      }
+    } catch (e: any) {
+      const answered = answersArray.length;
+      finalScore = Math.round((answered / Math.max(1, questions.length)) * 100);
+      setSubmitError(`No se pudo comunicar con el servidor: ${e?.message || 'Error desconocido'}`);
+      console.error('Fallo al enviar answerdailyquiz:', e);
+    }
+
     setScore(finalScore);
     setShowResults(true);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const reward = (s: number) => Math.floor(100 * (s / 100) * streakMultiplier);
 
-  const calculateReward = () => {
-    const baseReward = 100;
-    return Math.floor(baseReward * (score / 100) * streakMultiplier);
-  };
+  // --- Render states ---
+  if (!token) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>Sesión requerida</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-red-600">No hay token disponible. Inicia sesión para acceder al quiz.</p>
+            <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Cerrar</Button></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>Cargando quiz diario…</CardTitle></CardHeader>
+          <CardContent className="text-sm text-muted-foreground">Conectando…</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loadError || questions.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>{loadError ? 'Error' : 'Sin preguntas hoy'}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {loadError ? <p className="text-sm text-red-600">{loadError}</p> : <p className="text-sm">Vuelve más tarde.</p>}
+            <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Cerrar</Button></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (showResults) {
-    const reward = calculateReward();
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-2xl bg-white">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4">
-              {score >= 80 ? (
-                <Trophy className="h-16 w-16 text-yellow-500" />
-              ) : score >= 60 ? (
-                <Badge className="h-16 w-16 text-blue-500" />
-              ) : (
-                <Clock className="h-16 w-16 text-gray-500" />
-              )}
-            </div>
+            <div className="mx-auto mb-4"><Trophy className="h-16 w-16 text-yellow-500" /></div>
             <CardTitle className="text-2xl">
               {score >= 80 ? '¡Excelente trabajo!' : score >= 60 ? '¡Buen trabajo!' : '¡Sigue practicando!'}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
+            {submitError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-2">
+                {submitError}
+              </div>
+            )}
             <p className="text-lg">Tu puntuación: <span className="font-bold text-primary">{score}%</span></p>
-            
             <div className="bg-accent/20 p-4 rounded-lg">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Sparkles className="h-5 w-5 text-yellow-500" />
                 <span className="font-medium">Recompensa obtenida</span>
               </div>
-              <p className="text-2xl font-bold text-primary">{reward} KumoSoles</p>
+              <p className="text-2xl font-bold text-primary">{reward(score)} KumoSoles</p>
               {streakMultiplier > 1 && (
-                <Badge variant="secondary" className="mt-2">
-                  Bonus de racha: x{streakMultiplier}
-                </Badge>
+                <Badge variant="secondary" className="mt-2">Bonus de racha: x{streakMultiplier}</Badge>
               )}
             </div>
-
-            <div className="text-left bg-muted/20 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">Respuestas correctas:</h3>
-              <div className="space-y-2">
-                {questions.map((question, index) => (
-                  <div key={question.id} className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full ${
-                        selectedAnswers[index] === question.correctAnswer 
-                          ? 'bg-green-500' 
-                          : 'bg-red-500'
-                      }`}></div>
-                      <span>Pregunta {index + 1}</span>
-                    </div>
-                    {selectedAnswers[index] !== question.correctAnswer && (
-                      <p className="text-xs text-gray-600 ml-6 mt-1">
-                        Respuesta correcta: {question.options[question.correctAnswer]}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <Button
-              onClick={() => {
-                onComplete(score);
-                onClose();
-              }}
+              onClick={() => { onComplete(score); onClose(); }}
               className="w-full"
             >
               Continuar
@@ -190,44 +318,41 @@ export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalPr
     );
   }
 
+  const q = questions[currentQuestion];
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              Quiz Diario - Pregunta {currentQuestion + 1} de {questions.length}
+              Quiz Diario — Pregunta {currentQuestion + 1} de {questions.length}
             </CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full">
-                <Clock className="h-4 w-4" />
-                <span className="font-medium">{formatTime(timeLeft)}</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}><X className="h-4 w-4" /></Button>
           </div>
-          <Progress value={((currentQuestion + 1) / questions.length) * 100} className="h-2" />
+          <Progress value={progress} className="h-2" />
           {streakMultiplier > 1 && (
-            <Badge variant="secondary" className="w-fit">
-              Bonus de racha activo: x{streakMultiplier} KumoSoles
-            </Badge>
+            <Badge variant="secondary" className="w-fit">Bonus de racha: x{streakMultiplier} KumoSoles</Badge>
           )}
         </CardHeader>
         <CardContent className="space-y-6">
+          {submitError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {submitError}
+            </div>
+          )}
           <div>
-            <h3 className="text-lg font-medium mb-4">{questions[currentQuestion]?.question}</h3>
+            <h3 className="text-lg font-medium mb-4">{q.content}</h3>
             <div className="space-y-3">
-              {questions[currentQuestion]?.options.map((option, index) => (
+              {q.options.map((option, idx) => (
                 <Button
-                  key={index}
-                  variant={selectedAnswers[currentQuestion] === index ? "default" : "outline"}
+                  key={idx}
+                  variant={selectedAnswers[currentQuestion] === idx ? 'default' : 'outline'}
                   className="w-full text-left justify-start p-4 h-auto"
-                  onClick={() => handleAnswerSelect(index)}
+                  onClick={() => handleAnswerSelect(idx)}
                 >
-                  <span className="font-medium mr-3">{String.fromCharCode(65 + index)}.</span>
+                  <span className="font-medium mr-3">{String.fromCharCode(65 + idx)}.</span>
                   {option}
                 </Button>
               ))}
@@ -235,16 +360,8 @@ export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalPr
           </div>
 
           <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleNextQuestion}
-              disabled={selectedAnswers[currentQuestion] === undefined}
-            >
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button onClick={handleNextQuestion} disabled={selectedAnswers[currentQuestion] === undefined}>
               {currentQuestion === questions.length - 1 ? 'Finalizar Quiz' : 'Siguiente Pregunta'}
             </Button>
           </div>
