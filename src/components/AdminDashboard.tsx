@@ -138,41 +138,6 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/90 backdrop-blur">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Estudiantes</p>
-                  <p className="text-2xl font-bold">{stats.students}</p>
-                </div>
-                <GraduationCap className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/90 backdrop-blur">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Profesores</p>
-                  <p className="text-2xl font-bold">{stats.teachers}</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/90 backdrop-blur">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Administradores</p>
-                  <p className="text-2xl font-bold">{stats.admins}</p>
-                </div>
-                <Shield className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Tabla */}
@@ -197,7 +162,6 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
                       <TableHead>Usuario</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Nombre</TableHead>
-                      <TableHead>Rol</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

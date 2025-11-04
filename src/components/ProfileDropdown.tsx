@@ -14,23 +14,33 @@ import { Settings, User, LogOut, Bell, HelpCircle } from 'lucide-react';
 interface ProfileDropdownProps {
   userName: string;
   userEmail?: string;
-  userType: 'student' | 'teacher';
+  userType: 'student' | 'teacher' | 'admin';
   onLogout: () => void;
   onSettings?: () => void;
   onProfile?: () => void;
 }
 
-export function ProfileDropdown({ 
-  userName, 
-  userEmail, 
-  userType, 
-  onLogout, 
-  onSettings, 
-  onProfile 
+export function ProfileDropdown({
+  userName,
+  userEmail,
+  userType,
+  onLogout,
+  onSettings,
+  onProfile,
 }: ProfileDropdownProps) {
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
+  const getInitials = (name: string) =>
+    name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+
+  const roleLabel =
+    userType === 'student'
+      ? 'Estudiante'
+      : userType === 'teacher'
+      ? 'Profesor'
+      : 'Administrador';
 
   return (
     <DropdownMenu>
@@ -53,41 +63,35 @@ export function ProfileDropdown({
               </p>
             )}
             <p className="text-xs leading-none text-muted-foreground capitalize">
-              {userType === 'student' ? 'Estudiante' : 'Profesor'}
+              {roleLabel}
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={onProfile}
-          className="cursor-pointer"
-        >
+
+        <DropdownMenuItem onClick={onProfile} className="cursor-pointer">
           <User className="mr-2 h-4 w-4" />
           <span>Mi Perfil</span>
         </DropdownMenuItem>
-        
-        <DropdownMenuItem 
-          onClick={onSettings}
-          className="cursor-pointer"
-        >
+
+        <DropdownMenuItem onClick={onSettings} className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4" />
           <span>Configuración</span>
         </DropdownMenuItem>
-        
+
         <DropdownMenuItem className="cursor-pointer">
           <Bell className="mr-2 h-4 w-4" />
           <span>Notificaciones</span>
         </DropdownMenuItem>
-        
+
         <DropdownMenuItem className="cursor-pointer">
           <HelpCircle className="mr-2 h-4 w-4" />
           <span>Ayuda</span>
         </DropdownMenuItem>
-        
+
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
+
+        <DropdownMenuItem
           onClick={onLogout}
           className="cursor-pointer text-destructive focus:text-destructive"
         >

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MessageCircle, BookOpen, Trophy, Sparkles, Users, Gift, History } from 'lucide-react';
@@ -12,6 +11,8 @@ import { PetCustomization } from './PetCustomization';
 import { ClassroomPets } from './ClassroomPets';
 import { ProfileDropdown } from './ProfileDropdown';
 import { QuizHistory } from './QuizHistory';
+import { useAuth } from '../contexts/AuthContext';
+import type { ClassInfo } from './ChatBot';
 
 interface StudentData {
   name: string;
@@ -28,21 +29,28 @@ interface StudentDashboardProps {
   userData?: {
     name: string;
     email: string;
-    class: string;
   };
 }
 
-export interface ClassInfo {
-  id: string;
-  name: string;
-  teacher: string;
-  color: string;
+const BASE = 'http://localhost:3000';
+
+// genera color estable por id
+function colorFromId(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 70% 80%)`;
 }
 
 export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) {
+  const { token } = useAuth();
+
   const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'quiz' | 'customize' | 'classroom' | 'history'>('dashboard');
   const [studentData, setStudentData] = useState<StudentData>({
-    name: userData?.name || 'Ana García',
+    name: userData?.name || 'Estudiante',
     kumoSoles: 1250,
     streak: 5,
     level: 8,
@@ -51,15 +59,77 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
     petAccessories: ['gafas', 'sombrero']
   });
 
-  // Clases de ejemplo (asegúrate de que el id coincida con tu classId real)
-  const [classes] = useState<ClassInfo[]>([
-    { id: '1', name: 'Matemáticas 10A', teacher: 'Prof. Martínez', color: '#8DBCC7' },
-    { id: '2', name: 'Historia Universal', teacher: 'Prof. Silva', color: '#A4CCD9' },
-    { id: '3', name: 'Química Básica', teacher: 'Prof. Gómez', color: '#C4E1E6' },
-    { id: '4', name: 'Literatura Española', teacher: 'Prof. Torres', color: '#EBFFD8' }
-  ]);
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [classesError, setClassesError] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(null);
 
-  const [selectedClass, setSelectedClass] = useState<ClassInfo>(classes[0]);
+  const headers = useMemo(
+    () => ({
+      Authorization: `Bearer ${token}`,    // Token del estudiante
+      'Content-Type': 'application/json'
+    }),
+    [token]
+  );
+
+  // Cargar SOLO las clases donde está el estudiante -> GET /classes/
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMyClasses() {
+      try {
+        setClassesLoading(true);
+        setClassesError(null);
+
+        const resp = await fetch(`${BASE}/classes/`, { headers });
+
+        if (!resp.ok) {
+          let detail = '';
+          try {
+            const errJson = await resp.json();
+            detail = errJson?.message || JSON.stringify(errJson);
+          } catch { /* ignore */ }
+          throw new Error(`HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
+        }
+
+        const json = await resp.json();
+        const list = (json?.body ?? json ?? []) as Array<{
+          id: number | string;
+          name: string;
+          subject?: string;
+          teacher?: { name?: string } | string;
+        }>;
+
+        const mapped: ClassInfo[] = list.map((c) => {
+          const idStr = String(c.id);
+          const teacherName =
+            typeof c.teacher === 'string'
+              ? c.teacher
+              : c.teacher?.name ?? '';
+          return {
+            id: idStr,
+            name: c.name,
+            subject: c.subject,
+            teacher: teacherName,
+            color: colorFromId(idStr)
+          };
+        });
+
+        if (!cancelled) {
+          setClasses(mapped);
+          if (mapped.length > 0) setSelectedClass(mapped[0]);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          console.error('Error cargando /classes/:', e);
+          setClassesError('No se pudieron cargar tus clases. Revisa el token de estudiante o los permisos.');
+        }
+      } finally {
+        if (!cancelled) setClassesLoading(false);
+      }
+    }
+    if (token) loadMyClasses();
+    return () => { cancelled = true; };
+  }, [headers, token]);
 
   const todayQuizCompleted = false;
   const streakMultiplier = studentData.streak >= 3 ? 1.25 : 1;
@@ -83,6 +153,20 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   };
 
   if (activeView === 'chat') {
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveView('dashboard')}>Volver</Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                {classesLoading ? 'Cargando clases…' : 'Selecciona una clase para abrir el chat.'}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
     return (
       <ChatBot
         onBack={() => setActiveView('dashboard')}
@@ -123,26 +207,30 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
             </div>
             <div className="flex items-center gap-4">
               <Select
-                value={selectedClass.id}
+                value={selectedClass?.id}
                 onValueChange={(value) => {
                   const classInfo = classes.find(c => c.id === value);
                   if (classInfo) setSelectedClass(classInfo);
                 }}
+                disabled={classesLoading || !!classesError || classes.length === 0}
               >
-                <SelectTrigger className="w-56">
-                  <SelectValue />
+                <SelectTrigger className="w-72">
+                  <SelectValue placeholder={classesLoading ? 'Cargando…' : (classesError || 'Selecciona clase')} />
                 </SelectTrigger>
                 <SelectContent>
                   {classes.map((classInfo) => (
                     <SelectItem key={classInfo.id} value={classInfo.id}>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: classInfo.color }} />
-                        {classInfo.name}
+                        <span className="font-medium">
+                          {classInfo.name} <span className="text-xs opacity-70">(ID: {classInfo.id})</span>
+                        </span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
               <ProfileDropdown
                 userName={studentData.name}
                 userEmail={userData?.email}
@@ -203,7 +291,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-          <Button onClick={() => setActiveView('chat')} className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90">
+          <Button onClick={() => setActiveView('chat')} className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90" disabled={!selectedClass}>
             <MessageCircle className="h-8 w-8" />
             <span>Pregunta al Chat</span>
           </Button>
@@ -229,7 +317,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           </Button>
         </div>
 
-        {/* Progreso + Actividad: mantenemos igual */}
+        {/* Progreso + Actividad */}
         <Card className="bg-white/90 backdrop-blur mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -257,9 +345,16 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           </CardContent>
         </Card>
 
-        {/* (Ejemplo) Historial y Quiz modal */}
         {activeView === 'quiz' && (
           <QuizModal onClose={() => setActiveView('dashboard')} onComplete={handleQuizComplete} streakMultiplier={streakMultiplier} />
+        )}
+
+        {classesError && (
+          <Card className="bg-white/90 backdrop-blur">
+            <CardContent className="p-4 text-red-600 text-sm">
+              {classesError}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
