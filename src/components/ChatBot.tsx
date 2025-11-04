@@ -1,44 +1,134 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowLeft, Send, FileText, BookOpen, MessageCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ArrowLeft, Send, FileText, BookOpen, MessageCircle, PlusCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+interface ApiMessage {
+  id: number;
+  content: string;
+  sentBy: 'STUDENT' | 'AI' | 'TEACHER' | string;
+  sentAt: string;
+}
+
+interface ApiConversationSmall {
+  id: number;
+  title: string;
+}
+
+interface ApiConversation {
+  title: string;
+  messages: ApiMessage[];
+  startedAt: string;
+}
+
+interface SendMessageResponse {
+  id: number; // id del mensaje del alumno
+  responseMessageId: number;
+  response: string;
+  responseSentAt: string;
+}
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  relatedMaterial?: string;
+}
+
+interface ClassInfo {
+  id: string;     // debe mapear al classId que tu backend espera
+  name: string;
+  teacher: string;
+  color: string;
 }
 
 interface ChatBotProps {
   onBack: () => void;
+  selectedClass: ClassInfo;
+  classes: ClassInfo[];
+  onClassChange: (classInfo: ClassInfo) => void;
 }
 
-export function ChatBot({ onBack }: ChatBotProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: '¡Hola! Soy tu asistente de aprendizaje. Puedo ayudarte con cualquier pregunta sobre el material de clase. ¿En qué tema te gustaría que te ayude hoy?',
-      sender: 'bot',
-      timestamp: new Date()
-    }
-  ]);
+const BASE = 'http://localhost:3000';
+
+export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatBotProps) {
+  const { token } = useAuth();
+  const [conversations, setConversations] = useState<ApiConversationSmall[]>([]);
+  const [currentConvId, setCurrentConvId] = useState<number | null>(null);
+  const [currentConvTitle, setCurrentConvTitle] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingConv, setLoadingConv] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Mock data for available materials
-  const availableMaterials = [
-    'Matemáticas - Álgebra Lineal',
-    'Historia - Segunda Guerra Mundial',
-    'Ciencias - Sistema Solar',
-    'Literatura - Don Quijote',
-    'Química - Tabla Periódica'
-  ];
+  const headers = useMemo(
+    () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+    [token]
+  );
+
+  // Cargar conversaciones de la clase
+  useEffect(() => {
+    let cancelled = false;
+    async function loadList() {
+      try {
+        setLoadingList(true);
+        setConversations([]);
+        setCurrentConvId(null);
+        setMessages([]);
+        const resp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, {
+          headers
+        });
+        const json = await resp.json();
+        // DTO { code, message, body }
+        const list: ApiConversationSmall[] = json?.body ?? json ?? [];
+        if (!cancelled) {
+          setConversations(list);
+          if (list.length > 0) {
+            setCurrentConvId(list[0].id);
+          }
+        }
+      } finally {
+        if (!cancelled) setLoadingList(false);
+      }
+    }
+    if (token && selectedClass?.id) loadList();
+    return () => { cancelled = true; };
+  }, [headers, selectedClass?.id, token]);
+
+  // Cuando cambia currentConvId, cargar historial
+  useEffect(() => {
+    let cancelled = false;
+    async function loadConversation(convId: number) {
+      try {
+        setLoadingConv(true);
+        const resp = await fetch(`${BASE}/conversations/${convId}`, { headers });
+        const json = await resp.json();
+        const conv: ApiConversation = json?.body ?? json;
+
+        setCurrentConvTitle(conv.title ?? '');
+        const mapped: Message[] = (conv.messages ?? []).map((m) => ({
+          id: String(m.id),
+          text: m.content,
+          sender: m.sentBy === 'STUDENT' ? 'user' : 'bot',
+          timestamp: new Date(m.sentAt),
+        }));
+        if (!cancelled) setMessages(mapped);
+      } finally {
+        if (!cancelled) setLoadingConv(false);
+      }
+    }
+    if (token && currentConvId) loadConversation(currentConvId);
+    return () => { cancelled = true; };
+  }, [headers, token, currentConvId]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -47,10 +137,10 @@ export function ChatBot({ onBack }: ChatBotProps) {
   }, [messages, isTyping]);
 
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !currentConvId) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `u-${Date.now()}`,
       text: inputText,
       sender: 'user',
       timestamp: new Date()
@@ -60,56 +150,63 @@ export function ChatBot({ onBack }: ChatBotProps) {
     setInputText('');
     setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(inputText);
+    try {
+      const resp = await fetch(`${BASE}/conversations/${currentConvId}/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ content: userMessage.text })
+      });
+      const json = await resp.json();
+      const data: SendMessageResponse = json?.body ?? json;
+
       const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: botResponse.text,
+        id: `b-${data.responseMessageId}`,
+        text: data.response,
         sender: 'bot',
-        timestamp: new Date(),
-        relatedMaterial: botResponse.material
+        timestamp: new Date(data.responseSentAt)
       };
 
       setMessages(prev => [...prev, botMessage]);
+    } catch (e) {
+      console.error('Error enviando mensaje:', e);
+      // fallback de error en chat
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          text: 'Hubo un problema enviando tu mensaje. Intenta nuevamente.',
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 2000);
+    }
   };
 
-  const generateBotResponse = (userInput: string): { text: string; material?: string } => {
-    const input = userInput.toLowerCase();
-
-    if (input.includes('matemáticas') || input.includes('algebra') || input.includes('ecuación')) {
-      return {
-        text: 'Claro, puedo ayudarte con matemáticas. Según el material de "Álgebra Lineal" que subió tu profesor, las ecuaciones lineales se resuelven despejando la variable. ¿Te gustaría que repasemos algún ejercicio específico?',
-        material: 'Matemáticas - Álgebra Lineal'
-      };
+  const handleCreateConversation = async () => {
+    if (!newTitle.trim()) return;
+    try {
+      setCreating(true);
+      const resp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+      const json = await resp.json();
+      const { id } = json?.body ?? json; // { id: number }
+      setNewTitle('');
+      // refrescar lista y seleccionar la nueva
+      const listResp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, { headers });
+      const listJson = await listResp.json();
+      const list: ApiConversationSmall[] = listJson?.body ?? listJson ?? [];
+      setConversations(list);
+      setCurrentConvId(id);
+    } catch (e) {
+      console.error('Error creando conversación:', e);
+    } finally {
+      setCreating(false);
     }
-
-    if (input.includes('historia') || input.includes('guerra') || input.includes('mundial')) {
-      return {
-        text: 'En el material sobre la Segunda Guerra Mundial, tu profesor explica que comenzó en 1939 con la invasión de Polonia. Los principales países involucrados fueron las Potencias del Eje y los Aliados. ¿Qué aspecto específico te interesa más?',
-        material: 'Historia - Segunda Guerra Mundial'
-      };
-    }
-
-    if (input.includes('ciencias') || input.includes('planeta') || input.includes('solar')) {
-      return {
-        text: 'El sistema solar tiene 8 planetas principales. Según los apuntes de tu profesor, Mercurio es el más cercano al Sol y Neptuno el más lejano. ¿Te gustaría saber más sobre algún planeta en particular?',
-        material: 'Ciencias - Sistema Solar'
-      };
-    }
-
-    if (input.includes('quiz') || input.includes('examen') || input.includes('evaluación')) {
-      return {
-        text: 'Los quizzes diarios están basados en todo el material que ha subido tu profesor. Te recomiendo repasar los temas más recientes. ¿Necesitas ayuda para prepararte para algún tema específico?'
-      };
-    }
-
-    // Default response
-    return {
-      text: 'Puedo ayudarte con cualquiera de estos temas disponibles: Matemáticas, Historia, Ciencias, Literatura y Química. También puedo responder preguntas sobre los quizzes diarios. ¿Sobre qué te gustaría aprender?'
-    };
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -119,58 +216,135 @@ export function ChatBot({ onBack }: ChatBotProps) {
     }
   };
 
+  // (Opcional) lista lateral de materiales; puedes reemplazarlo con tu /materials
+  const availableMaterials = [
+    'Material de la clase (PDFs/PPT)',
+    'Apuntes del profesor',
+    'Enunciados de ejercicios'
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver
-          </Button>
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Asistente de Aprendizaje</h1>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={onBack} className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Volver
+            </Button>
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold">KumoChat</h1>
+            </div>
           </div>
+
+          <Select
+            value={selectedClass.id}
+            onValueChange={(value) => {
+              const classInfo = classes.find(c => c.id === value);
+              if (classInfo) onClassChange(classInfo);
+            }}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map((classInfo) => (
+                <SelectItem key={classInfo.id} value={classInfo.id}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: classInfo.color }} />
+                    {classInfo.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-6">
-          {/* Sidebar with available materials */}
-          <Card className="lg:col-span-1 bg-white/90 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5" />
-                Material Disponible
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {availableMaterials.map((material, index) => (
-                  <div
-                    key={index}
-                    className="p-3 rounded-lg bg-accent/50 border cursor-pointer hover:bg-accent/70 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="text-sm">{material}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Sidebar: Conversaciones + Material */}
+          <div className="space-y-6 lg:col-span-1">
+            <Card className="bg-white/90 backdrop-blur">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <MessageCircle className="h-5 w-5" />
+                  Conversaciones
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    placeholder="Título nueva conversación"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    disabled={creating}
+                  />
+                  <Button onClick={handleCreateConversation} disabled={creating || !newTitle.trim()}>
+                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <><PlusCircle className="h-4 w-4 mr-1" /> Crear</>}
+                  </Button>
+                </div>
 
-          {/* Chat Interface */}
+                {loadingList ? (
+                  <p className="text-sm text-gray-500">Cargando conversaciones…</p>
+                ) : conversations.length === 0 ? (
+                  <p className="text-sm text-gray-500">No tienes conversaciones. ¡Crea una! 👆</p>
+                ) : (
+                  <div className="space-y-2">
+                    {conversations.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setCurrentConvId(c.id)}
+                        className={`w-full text-left p-3 rounded-lg border hover:bg-accent/60 transition-colors ${
+                          c.id === currentConvId ? 'bg-accent/70 border-primary' : 'bg-accent/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{c.title || `Conv. ${c.id}`}</span>
+                          {c.id === currentConvId && <Badge variant="secondary" className="text-xs">Activa</Badge>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 backdrop-blur">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5" />
+                  Material Disponible
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {availableMaterials.map((m, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-accent/50 border flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                      <span className="text-sm">{m}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Chat */}
           <Card className="lg:col-span-3 bg-white/90 backdrop-blur">
+            <CardHeader className="pb-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {currentConvTitle ? currentConvTitle : currentConvId ? `Conversación #${currentConvId}` : '—'}
+                </CardTitle>
+              </div>
+            </CardHeader>
             <CardContent className="p-0">
               <div className="flex flex-col h-[600px]">
-                {/* Messages */}
                 <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+                  {loadingConv && (
+                    <p className="text-sm text-gray-500">Cargando mensajes…</p>
+                  )}
                   <div className="space-y-4">
                     {messages.map((message) => (
                       <div
@@ -184,12 +358,7 @@ export function ChatBot({ onBack }: ChatBotProps) {
                               : 'bg-muted text-gray-800'
                           }`}
                         >
-                          <p className="text-sm">{message.text}</p>
-                          {message.relatedMaterial && (
-                            <Badge variant="secondary" className="mt-2 text-xs">
-                              📚 {message.relatedMaterial}
-                            </Badge>
-                          )}
+                          <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                           <p className="text-xs opacity-70 mt-1">
                             {message.timestamp.toLocaleTimeString()}
                           </p>
@@ -220,19 +389,20 @@ export function ChatBot({ onBack }: ChatBotProps) {
                       onKeyPress={handleKeyPress}
                       placeholder="Escribe tu pregunta aquí..."
                       className="flex-1"
-                      disabled={isTyping}
+                      disabled={isTyping || !currentConvId}
                     />
                     <Button
                       onClick={handleSend}
-                      disabled={isTyping || !inputText.trim()}
+                      disabled={isTyping || !inputText.trim() || !currentConvId}
                       size="icon"
+                      title={!currentConvId ? 'Crea o selecciona una conversación' : 'Enviar'}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Presiona Enter para enviar o Shift+Enter para nueva línea
-                  </p>
+                  {!currentConvId && (
+                    <p className="text-xs text-gray-500 mt-2">Crea o selecciona una conversación para comenzar.</p>
+                  )}
                 </div>
               </div>
             </CardContent>

@@ -5,7 +5,6 @@ import { StudentDashboard } from './components/StudentDashboard';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { LoadingSpinner } from './components/LoadingSpinner';
 import { Role } from './types/auth';
 import { AdminDashboard } from './components/AdminDashboard';
 
@@ -13,7 +12,6 @@ type AppState = 'landing' | 'login';
 
 function AppContent() {
   const { user, logout, isLoading } = useAuth();
-  console.log('AppContent user:', user);
   const [currentView, setCurrentView] = useState<AppState>('landing');
 
   const handleLogout = () => {
@@ -21,59 +19,56 @@ function AppContent() {
     setCurrentView('landing');
   };
 
-  // Si está cargando, mostrar spinner
-  
 
-  // Si el usuario está autenticado, mostrar el dashboard correspondiente
   if (user) {
     if (user.role === Role.STUDENT) {
       return (
         <ProtectedRoute allowedRoles={[Role.STUDENT]}>
-          <StudentDashboard 
+          <StudentDashboard
             onLogout={handleLogout}
             userData={{
               name: user.name,
               email: user.email,
-              class: "Clase por asignar" // TODO: Fetch actual class from API
+              class: 'Clase por asignar',
             }}
           />
         </ProtectedRoute>
       );
-    } else if (user.role === Role.TEACHER) {
+    }
+
+    if (user.role === Role.TEACHER) {
       return (
         <ProtectedRoute allowedRoles={[Role.TEACHER]}>
           <TeacherDashboard
             teacherData={{
               name: user.name,
               email: user.email,
-              classes: [] // TODO: Fetch actual classes from API
+              classes: [], // Integrar a futuro: GET /classes del profe
             }}
             onLogout={handleLogout}
           />
         </ProtectedRoute>
       );
-    } else if (user.role === Role.ADMIN) {
+    }
+
+    if (user.role === Role.ADMIN) {
       return (
         <ProtectedRoute allowedRoles={[Role.ADMIN]}>
-          <AdminDashboard />
+          <AdminDashboard
+            adminData={{ name: user.name, email: user.email }}
+            onLogout={handleLogout}
+          />
         </ProtectedRoute>
       );
     }
   }
 
-  // Si no está autenticado, mostrar landing o login
   const renderCurrentView = () => {
     switch (currentView) {
       case 'landing':
         return <LandingPage onGetStarted={() => setCurrentView('login')} />;
-      
       case 'login':
-        return (
-          <LoginForm
-            onBack={() => setCurrentView('landing')}
-          />
-        );
-      
+        return <LoginForm onBack={() => setCurrentView('landing')} />;
       default:
         return <LandingPage onGetStarted={() => setCurrentView('login')} />;
     }

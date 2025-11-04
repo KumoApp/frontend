@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MessageCircle, BookOpen, Trophy, Sparkles, Users, Gift, History } from 'lucide-react';
 import { ChatBot } from './ChatBot';
 import { QuizModal } from './QuizModal';
@@ -31,6 +32,13 @@ interface StudentDashboardProps {
   };
 }
 
+export interface ClassInfo {
+  id: string;
+  name: string;
+  teacher: string;
+  color: string;
+}
+
 export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) {
   const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'quiz' | 'customize' | 'classroom' | 'history'>('dashboard');
   const [studentData, setStudentData] = useState<StudentData>({
@@ -42,6 +50,16 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
     petColor: '#8DBCC7',
     petAccessories: ['gafas', 'sombrero']
   });
+
+  // Clases de ejemplo (asegúrate de que el id coincida con tu classId real)
+  const [classes] = useState<ClassInfo[]>([
+    { id: '1', name: 'Matemáticas 10A', teacher: 'Prof. Martínez', color: '#8DBCC7' },
+    { id: '2', name: 'Historia Universal', teacher: 'Prof. Silva', color: '#A4CCD9' },
+    { id: '3', name: 'Química Básica', teacher: 'Prof. Gómez', color: '#C4E1E6' },
+    { id: '4', name: 'Literatura Española', teacher: 'Prof. Torres', color: '#EBFFD8' }
+  ]);
+
+  const [selectedClass, setSelectedClass] = useState<ClassInfo>(classes[0]);
 
   const todayQuizCompleted = false;
   const streakMultiplier = studentData.streak >= 3 ? 1.25 : 1;
@@ -65,7 +83,14 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   };
 
   if (activeView === 'chat') {
-    return <ChatBot onBack={() => setActiveView('dashboard')} />;
+    return (
+      <ChatBot
+        onBack={() => setActiveView('dashboard')}
+        selectedClass={selectedClass}
+        classes={classes}
+        onClassChange={setSelectedClass}
+      />
+    );
   }
 
   if (activeView === 'customize') {
@@ -96,20 +121,37 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
               <h1 className="text-3xl font-bold text-gray-800">¡Hola, {studentData.name}! 👋</h1>
               <p className="text-gray-600">¿Listo para aprender algo nuevo hoy?</p>
             </div>
-            <ProfileDropdown
-              userName={studentData.name}
-              userEmail={userData?.email}
-              userType="student"
-              onLogout={onLogout}
-              onSettings={() => {
-                // TODO: Implementar configuración
-                console.log('Abrir configuración');
-              }}
-              onProfile={() => {
-                // TODO: Implementar perfil
-                console.log('Abrir perfil');
-              }}
-            />
+            <div className="flex items-center gap-4">
+              <Select
+                value={selectedClass.id}
+                onValueChange={(value) => {
+                  const classInfo = classes.find(c => c.id === value);
+                  if (classInfo) setSelectedClass(classInfo);
+                }}
+              >
+                <SelectTrigger className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((classInfo) => (
+                    <SelectItem key={classInfo.id} value={classInfo.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: classInfo.color }} />
+                        {classInfo.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ProfileDropdown
+                userName={studentData.name}
+                userEmail={userData?.email}
+                userType="student"
+                onLogout={onLogout}
+                onSettings={() => console.log('Abrir configuración')}
+                onProfile={() => console.log('Abrir perfil')}
+              />
+            </div>
           </div>
         </div>
 
@@ -130,9 +172,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
               <div className="flex items-center justify-center mb-2">
                 <Trophy className="h-6 w-6 text-orange-500" />
                 {streakMultiplier > 1 && (
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    x{streakMultiplier}
-                  </Badge>
+                  <Badge variant="secondary" className="ml-1 text-xs">x{streakMultiplier}</Badge>
                 )}
               </div>
               <p className="text-2xl font-bold text-primary">{studentData.streak}</p>
@@ -152,12 +192,8 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
           <Card className="bg-white/90 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div className="mx-auto mb-2 flex items-center justify-center">
-                <img 
-                  src="/src/assets/kumo_logo.svg" 
-                  alt="Kumo Pet" 
-                  className="h-8 w-auto"
-                />
+              <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: studentData.petColor }}>
+                <span className="text-white text-xl">🐱</span>
               </div>
               <p className="text-sm font-medium">{studentData.petName}</p>
               <p className="text-xs text-gray-600">Tu mascota</p>
@@ -167,56 +203,33 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-          <Button
-            onClick={() => setActiveView('chat')}
-            className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90"
-          >
+          <Button onClick={() => setActiveView('chat')} className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90">
             <MessageCircle className="h-8 w-8" />
             <span>Pregunta al Chat</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('quiz')}
-            variant="secondary"
-            className="h-24 flex flex-col gap-2"
-            disabled={todayQuizCompleted}
-          >
+          <Button onClick={() => setActiveView('quiz')} variant="secondary" className="h-24 flex flex-col gap-2">
             <BookOpen className="h-8 w-8" />
-            <span>{todayQuizCompleted ? 'Quiz Completado' : 'Quiz Diario'}</span>
-            {!todayQuizCompleted && (
-              <Badge variant="destructive" className="text-xs">¡Nuevo!</Badge>
-            )}
+            <span>Quiz Diario</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('history')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('history')} variant="outline" className="h-24 flex flex-col gap-2">
             <History className="h-8 w-8" />
             <span>Historial de Quizzes</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('customize')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('customize')} variant="outline" className="h-24 flex flex-col gap-2">
             <Gift className="h-8 w-8" />
             <span>Personalizar Mascota</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('classroom')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('classroom')} variant="outline" className="h-24 flex flex-col gap-2">
             <Users className="h-8 w-8" />
             <span>Mascotas del Salón</span>
           </Button>
         </div>
 
-        {/* Progress Section */}
+        {/* Progreso + Actividad: mantenemos igual */}
         <Card className="bg-white/90 backdrop-blur mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -244,39 +257,9 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="bg-white/90 backdrop-blur">
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Completaste el quiz de Matemáticas (+125 KumoSoles)</span>
-                <span className="text-xs text-gray-500 ml-auto">Ayer</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">Personalizaste tu mascota con nuevos accesorios</span>
-                <span className="text-xs text-gray-500 ml-auto">Hace 2 días</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span className="text-sm">¡Alcanzaste el Nivel 8! (+200 KumoSoles bonus)</span>
-                <span className="text-xs text-gray-500 ml-auto">Hace 3 días</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quiz Modal */}
+        {/* (Ejemplo) Historial y Quiz modal */}
         {activeView === 'quiz' && (
-          <QuizModal
-            onClose={() => setActiveView('dashboard')}
-            onComplete={handleQuizComplete}
-            streakMultiplier={streakMultiplier}
-          />
+          <QuizModal onClose={() => setActiveView('dashboard')} onComplete={handleQuizComplete} streakMultiplier={streakMultiplier} />
         )}
       </div>
     </div>

@@ -31,18 +31,15 @@ export function LoginForm({ onBack }: LoginFormProps) {
 
     try {
       const result = await login(trimmedUser, trimmedPass);
-      // caso en que login devuelva false en vez de lanzar excepción
       if (result === false) {
         setPassword('');
         setError('Usuario o contraseña incorrectos');
         (document.getElementById('username') as HTMLInputElement | null)?.focus();
       }
-      // si login fue exitoso, el contexto actualizará la UI
     } catch (err: any) {
-      // detectar credenciales inválidas de forma robusta
       const isInvalidCreds =
         err instanceof InvalidCredentialsError ||
-        err instanceof TokenInvalidError && err.name === 'InvalidCredentialsError' ||
+        (err instanceof TokenInvalidError && err.name === 'InvalidCredentialsError') ||
         err?.name === 'InvalidCredentialsError' ||
         (typeof err?.message === 'string' && /usuario|contraseña|credencial|invalid/i.test(err.message)) ||
         err?.response?.status === 401;
@@ -70,11 +67,32 @@ export function LoginForm({ onBack }: LoginFormProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md relative">
         <Button variant="ghost" onClick={onBack} className="mb-6 flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Volver al inicio
         </Button>
+
+        {/* BURBUJA DE ERROR flotante (speech bubble) */}
+        {error && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="absolute -top-4 right-0 translate-y-[-100%] max-w-xs z-10"
+          >
+            <div className="relative bg-red-500 text-white px-4 py-3 rounded-2xl shadow-lg">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">{error}</span>
+              </div>
+              {/* piquito */}
+              <span
+                className="absolute -bottom-2 right-6 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-red-500"
+                aria-hidden
+              />
+            </div>
+          </div>
+        )}
 
         <Card className="bg-white/95 backdrop-blur shadow-2xl">
           <CardHeader className="space-y-4">
@@ -99,6 +117,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
                   placeholder="Ingresa tu nombre de usuario"
                   required
                   disabled={isLoading}
+                  aria-invalid={!!error}
                 />
               </div>
 
@@ -113,6 +132,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
                     placeholder="Tu contraseña"
                     required
                     disabled={isLoading}
+                    aria-invalid={!!error}
                   />
                   <Button
                     type="button"
@@ -120,6 +140,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
                   </Button>
@@ -130,16 +151,6 @@ export function LoginForm({ onBack }: LoginFormProps) {
                 {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
-
-            {/* ERROR VISIBLE ABAJO DEL FORM (ROJO) */}
-            {error && (
-              <div role="alert" aria-live="assertive" className="mt-2 p-3 bg-red-50 border border-red-200 rounded text-red-700">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">{error}</span>
-                </div>
-              </div>
-            )}
 
             <div className="relative mt-4">
               <div className="absolute inset-0 flex items-center">
