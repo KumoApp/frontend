@@ -263,9 +263,24 @@ export function TeacherDashboard({ teacherData, onLogout }: TeacherDashboardProp
 
   if (viewingStudentHistory && students.length > 0) {
     const st = students.find((s) => String(s.id) === viewingStudentHistory);
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setViewingStudentHistory(null)}>Volver</Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                Selecciona una clase para ver el historial de quizzes del estudiante.
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
     return (
       <QuizHistory
         onBack={() => setViewingStudentHistory(null)}
+        classId={selectedClass.id}
         studentName={st ? `${st.name} ${st.lastname ?? ''}`.trim() : undefined}
       />
     );

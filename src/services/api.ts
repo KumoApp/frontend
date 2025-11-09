@@ -77,4 +77,146 @@ export const classService = {
   },
 };
 
+// Quiz types based on backend DTOs
+export interface QuizSmallResponse {
+  id: number;
+  totalQuestions: number;
+  date: string;
+}
+
+export interface QuizQuestion {
+  id: number;
+  questionNumber: number;
+  content: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+}
+
+export interface QuizFullResponse {
+  id: number;
+  totalQuestions: number;
+  date: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizAnswerSmallResponse {
+  quizId: number;
+  studentId: number;
+  classId: number;
+  score: number;
+  total: number;
+}
+
+export interface QuizAnswerFullResponse {
+  quizId: number;
+  studentId: number;
+  classId: number;
+  correctAnswers: number[]; // Array of numbers (0, 1, 2, 3)
+  answers: number[]; // Array of numbers (0, 1, 2, 3)
+  score: number;
+  total: number;
+}
+
+export interface AnswerDailyQuizRequest {
+  answers: number[]; // Array of numbers (0, 1, 2, 3) where A=0, B=1, C=2, D=3
+}
+
+export interface AnswerDailyQuizResponse {
+  correctAnswers: number[]; // Array of numbers (0, 1, 2, 3)
+  correct: boolean[]; // Array of booleans indicating if each answer was correct
+  score: number;
+  total: number;
+}
+
+export const quizService = {
+  // GET /quizzes/classes/:classId - GetAllQuizzesbyId
+  async getQuizzesFromClass(classId: number): Promise<QuizSmallResponse[]> {
+    console.log(`[QuizService] GET /quizzes/classes/${classId}`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${classId}`);
+    console.log(`[QuizService] Response:`, response.data);
+    // Backend puede devolver directamente un array o envuelto en { body: [...] }
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    // Si viene envuelto en un objeto con 'body'
+    if (data?.body && Array.isArray(data.body)) {
+      return data.body;
+    }
+    // Si viene envuelto en otro formato
+    if (data?.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    console.warn('[QuizService] Formato de respuesta inesperado:', data);
+    return [];
+  },
+
+  // GET /quizzes/:quizId - GetQuizInfoByID
+  async getQuizInfoById(quizId: number): Promise<QuizFullResponse> {
+    console.log(`[QuizService] GET /quizzes/${quizId}`);
+    const response = await apiClient.get<any>(`/quizzes/${quizId}`);
+    console.log(`[QuizService] Response:`, response.data);
+    const data = response.data;
+    // Manejar respuesta directa o envuelta
+    return data?.body || data?.data || data;
+  },
+
+  // GET /quizzes/classes/:classId/daily - GetDailyQuiz
+  async getDailyQuiz(classId: number): Promise<QuizFullResponse> {
+    console.log(`[QuizService] GET /quizzes/classes/${classId}/daily`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${classId}/daily`);
+    console.log(`[QuizService] Response:`, response.data);
+    const data = response.data;
+    // Manejar respuesta directa o envuelta
+    return data?.body || data?.data || data;
+  },
+
+  // GET /quizzes/classes/:classId/answers - GetAllOwnAnswers
+  async getAllOwnAnswers(classId: number): Promise<QuizAnswerSmallResponse[]> {
+    console.log(`[QuizService] GET /quizzes/classes/${classId}/answers`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${classId}/answers`);
+    console.log(`[QuizService] Response:`, response.data);
+    const data = response.data;
+    // Backend puede devolver directamente un array o envuelto en { body: [...] }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    // Si viene envuelto en un objeto con 'body'
+    if (data?.body && Array.isArray(data.body)) {
+      return data.body;
+    }
+    // Si viene envuelto en otro formato
+    if (data?.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    console.warn('[QuizService] Formato de respuesta inesperado:', data);
+    return [];
+  },
+
+  // GET /quizzes/:quizId/answer - GetOwnANswer
+  async getOwnAnswer(quizId: number): Promise<QuizAnswerFullResponse> {
+    console.log(`[QuizService] GET /quizzes/${quizId}/answer`);
+    const response = await apiClient.get<any>(`/quizzes/${quizId}/answer`);
+    console.log(`[QuizService] Response:`, response.data);
+    const data = response.data;
+    // Manejar respuesta directa o envuelta
+    return data?.body || data?.data || data;
+  },
+
+  // POST /quizzes/classes/:classId/daily/answer - AnswerDailyQuiz
+  async answerDailyQuiz(classId: number, answers: AnswerDailyQuizRequest): Promise<AnswerDailyQuizResponse> {
+    console.log(`[QuizService] POST /quizzes/classes/${classId}/daily/answer`, answers);
+    const response = await apiClient.post<any>(
+      `/quizzes/classes/${classId}/daily/answer`,
+      answers
+    );
+    console.log(`[QuizService] Response:`, response.data);
+    const data = response.data;
+    // Manejar respuesta directa o envuelta
+    return data?.body || data?.data || data;
+  },
+};
+
 export default apiClient;

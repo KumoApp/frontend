@@ -5,38 +5,13 @@ import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { X, Trophy, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-const DEFAULT_BASE = 'http://localhost:3000';
-
-type DailyQuizAPI = {
-  code: number;
-  message: string;
-  body: {
-    id: number;
-    totalQuestions: number;
-    date: string;
-    questions: Array<{
-      id: number;
-      questionNumber: number;
-      content: string;
-      optionA: string;
-      optionB: string;
-      optionC: string;
-      optionD: string;
-    }>;
-  };
-};
-
-type SubmitDailyResp =
-  | { code: number; message: string; body?: { score?: number; correctCount?: number; total?: number } }
-  | any;
+import { quizService, QuizFullResponse, AnswerDailyQuizResponse } from '../services/api';
 
 interface QuizModalProps {
   classId: string | number;
   onClose: () => void;
   onComplete: (score: number) => void;
   streakMultiplier: number;
-  baseUrl?: string;
 }
 
 export function QuizModal({
@@ -44,17 +19,8 @@ export function QuizModal({
   onClose,
   onComplete,
   streakMultiplier,
-  baseUrl = DEFAULT_BASE,
 }: QuizModalProps) {
   const { token } = useAuth();
-  const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    }),
-    [token]
-  );
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -72,8 +38,6 @@ export function QuizModal({
   // === Cargar quiz diario ===
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
 
     async function loadDaily() {
       if (!token) {
@@ -91,45 +55,62 @@ export function QuizModal({
         setLoading(true);
         setLoadError(null);
 
-        const url = `${baseUrl}/quizzes/classes/${classId}/daily`;
-        const resp = await fetch(url, { headers, signal: controller.signal });
+        // Primero verificar si ya se respondió el quiz diario de hoy
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Obtener el quiz diario para saber su ID
+          const quizData: QuizFullResponse = await quizService.getDailyQuiz(Number(classId));
+          
+          if (!quizData || !quizData.id) {
+            throw new Error('No se pudo obtener el quiz diario.');
+          }
 
-        if (!resp.ok) {
-          let detail = '';
-          try {
-            const j = await resp.json();
-            detail = j?.message || j?.error || '';
-          } catch {}
-          throw new Error(`GET /daily → HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
-        }
+          // Verificar si ya hay respuestas para este quiz
+          const allAnswers = await quizService.getAllOwnAnswers(Number(classId));
+          const quizAlreadyAnswered = allAnswers.some(answer => answer.quizId === quizData.id);
 
-        const json: DailyQuizAPI = await resp.json();
-        const b = json?.body;
+          if (quizAlreadyAnswered) {
+            if (!cancelled) {
+              setLoadError('Ya has completado el quiz diario de hoy. Vuelve mañana para un nuevo quiz.');
+            }
+            return;
+          }
 
-        if (!b || !Array.isArray(b.questions)) {
-          throw new Error('Respuesta inesperada del backend: faltan preguntas.');
-        }
+          // Si no está respondido, cargar las preguntas
+          if (!quizData || !Array.isArray(quizData.questions)) {
+            throw new Error('Respuesta inesperada del backend: faltan preguntas.');
+          }
 
-        const mapped = b.questions
-          .slice()
-          .sort((a, b) => a.questionNumber - b.questionNumber)
-          .map((q) => ({
-            id: q.id,
-            questionNumber: q.questionNumber,
-            content: q.content,
-            options: [q.optionA, q.optionB, q.optionC, q.optionD],
-          }));
+          const mapped = quizData.questions
+            .slice()
+            .sort((a, b) => a.questionNumber - b.questionNumber)
+            .map((q) => ({
+              id: q.id,
+              questionNumber: q.questionNumber,
+              content: q.content,
+              options: [q.optionA, q.optionB, q.optionC, q.optionD],
+            }));
 
-        if (!cancelled) {
-          setQuestions(mapped);
-          setSelectedAnswers(Array(mapped.length).fill(undefined));
-          setCurrentQuestion(0);
-          setSubmitError(null);
+          if (!cancelled) {
+            setQuestions(mapped);
+            setSelectedAnswers(Array(mapped.length).fill(undefined));
+            setCurrentQuestion(0);
+            setSubmitError(null);
+          }
+        } catch (e: any) {
+          // Si el error es que ya está respondido, no hacer nada más
+          if (e?.message?.includes('Ya has completado')) {
+            return;
+          }
+          throw e;
         }
       } catch (e: any) {
         if (!cancelled) {
-          if (e?.name === 'AbortError') {
-            setLoadError('La solicitud tardó demasiado (timeout). Verifica el backend o la red.');
+          // Verificar si el error es porque ya se respondió
+          if (e?.response?.status === 400 || e?.response?.status === 409) {
+            setLoadError('Ya has completado el quiz diario de hoy. Vuelve mañana para un nuevo quiz.');
           } else {
             setLoadError(e?.message || 'No se pudo cargar el quiz diario.');
           }
@@ -137,7 +118,6 @@ export function QuizModal({
         }
       } finally {
         if (!cancelled) setLoading(false);
-        clearTimeout(timeout);
       }
     }
 
@@ -145,10 +125,8 @@ export function QuizModal({
 
     return () => {
       cancelled = true;
-      controller.abort();
-      clearTimeout(timeout);
     };
-  }, [headers, token, classId, baseUrl]);
+  }, [token, classId]);
 
   const handleAnswerSelect = (optionIndex: number) => {
     setSelectedAnswers((prev) => {
@@ -177,56 +155,35 @@ export function QuizModal({
     }
 
     // === Payload EXACTO que pide tu backend ===
-    // { "answers": [0, 2, 1, ...] }
+    // { "answers": [0, 2, 1, ...] } donde A=0, B=1, C=2, D=3
     const answersArray = (selectedAnswers as number[]).map((a) => Number(a));
-    const payload = { answers: answersArray };
 
     let finalScore = 0;
 
     try {
-      const resp = await fetch(`${baseUrl}/quizzes/classes/${classId}/daily/answer`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
+      // Backend returns data directly, not wrapped in { code, message, body }
+      const response: AnswerDailyQuizResponse = await quizService.answerDailyQuiz(Number(classId), {
+        answers: answersArray,
       });
 
-      if (!resp.ok) {
-        let detailMsg = `HTTP ${resp.status} ${resp.statusText}`;
-        try {
-          const txt = await resp.text();
-          try {
-            const j = JSON.parse(txt);
-            detailMsg = j?.message || j?.error || detailMsg;
-          } catch {
-            if (txt) detailMsg = `${detailMsg} - ${txt}`;
-          }
-        } catch {}
-        setSubmitError(`No se pudo enviar tus respuestas: ${detailMsg}`);
-        // Proxy: porcentaje contestadas (aquí deberían ser todas, así que 100)
-        finalScore = Math.round((answersArray.length / Math.max(1, questions.length)) * 100);
-        setScore(finalScore);
-        setShowResults(true);
-        return;
-      }
-
-      // OK: intenta leer el resultado (score/correctCount/total)
-      let data: SubmitDailyResp | null = null;
-      try {
-        data = await resp.json();
-      } catch {
-        data = null;
-      }
-
-      const s = data?.body?.score;
-      if (typeof s === 'number' && !Number.isNaN(s)) {
-        finalScore = Math.max(0, Math.min(100, Math.round(s)));
-      } else if (data?.body?.correctCount != null && data?.body?.total != null) {
-        finalScore = Math.round((data.body.correctCount / Math.max(1, data.body.total)) * 100);
+      // Calculate score as percentage
+      if (response.score != null && response.total != null) {
+        finalScore = Math.round((response.score / response.total) * 100);
+      } else if (response.score != null) {
+        finalScore = Math.max(0, Math.min(100, Math.round(response.score)));
       } else {
-        // si no hay score, asume 100% contestadas
-        finalScore = 100;
+        // Fallback: calculate from correct array
+        const correctCount = response.correct?.filter((c) => c).length ?? 0;
+        finalScore = Math.round((correctCount / Math.max(1, answersArray.length)) * 100);
       }
     } catch (e: any) {
+      // Verificar si el error es porque ya se respondió el quiz
+      if (e?.response?.status === 400 || e?.response?.status === 409) {
+        setSubmitError('Ya has completado el quiz diario de hoy. No puedes responderlo dos veces.');
+        setShowResults(false);
+        return;
+      }
+      
       const answered = answersArray.length;
       finalScore = Math.round((answered / Math.max(1, questions.length)) * 100);
       setSubmitError(`No se pudo comunicar con el servidor: ${e?.message || 'Error desconocido'}`);

@@ -202,14 +202,28 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   }
 
   if (activeView === 'history') {
-  return (
-    <QuizHistory
-      onBack={() => setActiveView('dashboard')}
-      classId={selectedClass?.id ?? ''}         // <- toma el ID del selector
-      studentName={studentData.name}
-    />
-  );
-}
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveView('dashboard')}>Volver</Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                {classesLoading ? 'Cargando clases…' : 'Selecciona una clase para ver el historial de quizzes.'}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <QuizHistory
+        onBack={() => setActiveView('dashboard')}
+        classId={selectedClass.id}
+        studentName={studentData.name}
+      />
+    );
+  }
 
 
   // Vista principal (dashboard)
@@ -387,7 +401,6 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
             onClose={() => setActiveView('dashboard')}
             onComplete={handleQuizComplete}
             streakMultiplier={streakMultiplier}
-            baseUrl={BASE}
           />
         )}
 
