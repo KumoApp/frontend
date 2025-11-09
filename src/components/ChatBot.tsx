@@ -236,9 +236,16 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
 
         if (!cancelled) {
           setMessages(mapped);
-          setStickBottom(false);
+          setStickBottom(true); // Activar stickBottom para ir al final
+          // Scroll al final cuando se carga la conversación
           requestAnimationFrame(() => {
-            if (scrollRef.current) scrollRef.current.scrollTop = 0;
+            if (scrollRef.current) {
+              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+            // También usar endRef para asegurar que se vea el final
+            setTimeout(() => {
+              endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
           });
         }
       } catch (err: any) {
