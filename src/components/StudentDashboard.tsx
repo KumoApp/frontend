@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MessageCircle, BookOpen, Trophy, Sparkles, Users, Gift, History } from 'lucide-react';
+
 import { ChatBot } from './ChatBot';
 import { QuizModal } from './QuizModal';
 import { PetCustomization } from './PetCustomization';
 import { ClassroomPets } from './ClassroomPets';
 import { ProfileDropdown } from './ProfileDropdown';
 import { QuizHistory } from './QuizHistory';
+import { useAuth } from '../contexts/AuthContext';
+
+export interface ClassInfo {
+  id: string;
+  name: string;
+  subject?: string;
+  teacher?: string;
+  color: string;
+}
 
 interface StudentData {
   name: string;
@@ -27,14 +37,29 @@ interface StudentDashboardProps {
   userData?: {
     name: string;
     email: string;
-    class: string;
   };
 }
 
+const BASE = 'http://localhost:3000';
+
+// genera color estable por id
+function colorFromId(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 70% 80%)`;
+}
+
 export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) {
+  const { token } = useAuth();
+
   const [activeView, setActiveView] = useState<'dashboard' | 'chat' | 'quiz' | 'customize' | 'classroom' | 'history'>('dashboard');
+
   const [studentData, setStudentData] = useState<StudentData>({
-    name: userData?.name || 'Ana García',
+    name: userData?.name || 'Estudiante',
     kumoSoles: 1250,
     streak: 5,
     level: 8,
@@ -42,6 +67,78 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
     petColor: '#8DBCC7',
     petAccessories: ['gafas', 'sombrero']
   });
+
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [classesLoading, setClassesLoading] = useState(false);
+  const [classesError, setClassesError] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(null);
+
+  const headers = useMemo(
+    () => ({
+      Authorization: `Bearer ${token}`, // Token del estudiante
+      'Content-Type': 'application/json'
+    }),
+    [token]
+  );
+
+  // Cargar SOLO las clases donde está el estudiante -> GET /classes/
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMyClasses() {
+      try {
+        setClassesLoading(true);
+        setClassesError(null);
+
+        const resp = await fetch(`${BASE}/classes/`, { headers });
+
+        if (!resp.ok) {
+          let detail = '';
+          try {
+            const errJson = await resp.json();
+            detail = errJson?.message || JSON.stringify(errJson);
+          } catch { /* ignore */ }
+          throw new Error(`HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
+        }
+
+        const json = await resp.json();
+        const list = (json?.body ?? json ?? []) as Array<{
+          id: number | string;
+          name: string;
+          subject?: string;
+          teacher?: { name?: string } | string;
+        }>;
+
+        const mapped: ClassInfo[] = list.map((c) => {
+          const idStr = String(c.id);
+          const teacherName =
+            typeof c.teacher === 'string'
+              ? c.teacher
+              : c.teacher?.name ?? '';
+          return {
+            id: idStr,
+            name: c.name,
+            subject: c.subject,
+            teacher: teacherName,
+            color: colorFromId(idStr)
+          };
+        });
+
+        if (!cancelled) {
+          setClasses(mapped);
+          if (mapped.length > 0) setSelectedClass(mapped[0]);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          console.error('Error cargando /classes/:', e);
+          setClassesError('No se pudieron cargar tus clases. Revisa el token de estudiante o los permisos.');
+        }
+      } finally {
+        if (!cancelled) setClassesLoading(false);
+      }
+    }
+    if (token) loadMyClasses();
+    return () => { cancelled = true; };
+  }, [headers, token]);
 
   const todayQuizCompleted = false;
   const streakMultiplier = studentData.streak >= 3 ? 1.25 : 1;
@@ -64,8 +161,30 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
     }));
   };
 
+  // Vistas secundarias
   if (activeView === 'chat') {
-    return <ChatBot onBack={() => setActiveView('dashboard')} />;
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveView('dashboard')}>Volver</Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                {classesLoading ? 'Cargando clases…' : 'Selecciona una clase para abrir el chat.'}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <ChatBot
+        onBack={() => setActiveView('dashboard')}
+        selectedClass={selectedClass}
+        classes={classes}
+        onClassChange={setSelectedClass}
+      />
+    );
   }
 
   if (activeView === 'customize') {
@@ -83,9 +202,31 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
   }
 
   if (activeView === 'history') {
-    return <QuizHistory onBack={() => setActiveView('dashboard')} />;
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveView('dashboard')}>Volver</Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                {classesLoading ? 'Cargando clases…' : 'Selecciona una clase para ver el historial de quizzes.'}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <QuizHistory
+        onBack={() => setActiveView('dashboard')}
+        classId={selectedClass.id}
+        studentName={studentData.name}
+      />
+    );
   }
 
+
+  // Vista principal (dashboard)
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
       <div className="max-w-6xl mx-auto">
@@ -96,20 +237,41 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
               <h1 className="text-3xl font-bold text-gray-800">¡Hola, {studentData.name}! 👋</h1>
               <p className="text-gray-600">¿Listo para aprender algo nuevo hoy?</p>
             </div>
-            <ProfileDropdown
-              userName={studentData.name}
-              userEmail={userData?.email}
-              userType="student"
-              onLogout={onLogout}
-              onSettings={() => {
-                // TODO: Implementar configuración
-                console.log('Abrir configuración');
-              }}
-              onProfile={() => {
-                // TODO: Implementar perfil
-                console.log('Abrir perfil');
-              }}
-            />
+            <div className="flex items-center gap-4">
+              <Select
+                value={selectedClass?.id}
+                onValueChange={(value) => {
+                  const classInfo = classes.find(c => c.id === value);
+                  if (classInfo) setSelectedClass(classInfo);
+                }}
+                disabled={classesLoading || !!classesError || classes.length === 0}
+              >
+                <SelectTrigger className="w-72">
+                  <SelectValue placeholder={classesLoading ? 'Cargando…' : (classesError || 'Selecciona clase')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((classInfo) => (
+                    <SelectItem key={classInfo.id} value={classInfo.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: classInfo.color }} />
+                        <span className="font-medium">
+                          {classInfo.name} <span className="text-xs opacity-70">(ID: {classInfo.id})</span>
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <ProfileDropdown
+                userName={studentData.name}
+                userEmail={userData?.email}
+                userType="student"
+                onLogout={onLogout}
+                onSettings={() => console.log('Abrir configuración')}
+                onProfile={() => console.log('Abrir perfil')}
+              />
+            </div>
           </div>
         </div>
 
@@ -130,9 +292,7 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
               <div className="flex items-center justify-center mb-2">
                 <Trophy className="h-6 w-6 text-orange-500" />
                 {streakMultiplier > 1 && (
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    x{streakMultiplier}
-                  </Badge>
+                  <Badge variant="secondary" className="ml-1 text-xs">x{streakMultiplier}</Badge>
                 )}
               </div>
               <p className="text-2xl font-bold text-primary">{studentData.streak}</p>
@@ -152,12 +312,8 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
 
           <Card className="bg-white/90 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div className="mx-auto mb-2 flex items-center justify-center">
-                <img 
-                  src="/src/assets/kumo_logo.svg" 
-                  alt="Kumo Pet" 
-                  className="h-8 w-auto"
-                />
+              <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: studentData.petColor }}>
+                <span className="text-white text-xl">🐱</span>
               </div>
               <p className="text-sm font-medium">{studentData.petName}</p>
               <p className="text-xs text-gray-600">Tu mascota</p>
@@ -170,53 +326,47 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           <Button
             onClick={() => setActiveView('chat')}
             className="h-24 flex flex-col gap-2 bg-primary hover:bg-primary/90"
+            disabled={!selectedClass}
+            title={!selectedClass ? 'Selecciona una clase primero' : 'Abrir chat'}
           >
             <MessageCircle className="h-8 w-8" />
             <span>Pregunta al Chat</span>
           </Button>
 
           <Button
-            onClick={() => setActiveView('quiz')}
+            onClick={() => {
+              if (!selectedClass) {
+                alert('Primero selecciona una clase en el selector superior.');
+                return;
+              }
+              setActiveView('quiz');
+            }}
             variant="secondary"
             className="h-24 flex flex-col gap-2"
-            disabled={todayQuizCompleted}
+            disabled={!selectedClass}
+            title={!selectedClass ? 'Selecciona una clase primero' : 'Abrir quiz diario'}
           >
             <BookOpen className="h-8 w-8" />
-            <span>{todayQuizCompleted ? 'Quiz Completado' : 'Quiz Diario'}</span>
-            {!todayQuizCompleted && (
-              <Badge variant="destructive" className="text-xs">¡Nuevo!</Badge>
-            )}
+            <span>Quiz Diario</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('history')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('history')} variant="outline" className="h-24 flex flex-col gap-2">
             <History className="h-8 w-8" />
             <span>Historial de Quizzes</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('customize')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('customize')} variant="outline" className="h-24 flex flex-col gap-2">
             <Gift className="h-8 w-8" />
             <span>Personalizar Mascota</span>
           </Button>
 
-          <Button
-            onClick={() => setActiveView('classroom')}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
+          <Button onClick={() => setActiveView('classroom')} variant="outline" className="h-24 flex flex-col gap-2">
             <Users className="h-8 w-8" />
             <span>Mascotas del Salón</span>
           </Button>
         </div>
 
-        {/* Progress Section */}
+        {/* Progreso + Actividad */}
         <Card className="bg-white/90 backdrop-blur mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -244,39 +394,22 @@ export function StudentDashboard({ onLogout, userData }: StudentDashboardProps) 
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card className="bg-white/90 backdrop-blur">
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Completaste el quiz de Matemáticas (+125 KumoSoles)</span>
-                <span className="text-xs text-gray-500 ml-auto">Ayer</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">Personalizaste tu mascota con nuevos accesorios</span>
-                <span className="text-xs text-gray-500 ml-auto">Hace 2 días</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span className="text-sm">¡Alcanzaste el Nivel 8! (+200 KumoSoles bonus)</span>
-                <span className="text-xs text-gray-500 ml-auto">Hace 3 días</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quiz Modal */}
-        {activeView === 'quiz' && (
+        {/* Modal del Quiz Diario (pasa classId desde el selector superior) */}
+        {activeView === 'quiz' && selectedClass && (
           <QuizModal
+            classId={selectedClass.id}      // <- AQUÍ se cablea el ID del selector superior
             onClose={() => setActiveView('dashboard')}
             onComplete={handleQuizComplete}
             streakMultiplier={streakMultiplier}
           />
+        )}
+
+        {classesError && (
+          <Card className="bg-white/90 backdrop-blur">
+            <CardContent className="p-4 text-red-600 text-sm">
+              {classesError}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

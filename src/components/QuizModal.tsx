@@ -1,185 +1,270 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
-import { X, Clock, Trophy, Sparkles } from 'lucide-react';
-
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation: string;
-}
+import { X, Trophy, Sparkles } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { quizService, QuizFullResponse, AnswerDailyQuizResponse } from '../services/api';
 
 interface QuizModalProps {
+  classId: string | number;
   onClose: () => void;
   onComplete: (score: number) => void;
   streakMultiplier: number;
 }
 
-export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalProps) {
+export function QuizModal({
+  classId,
+  onClose,
+  onComplete,
+  streakMultiplier,
+}: QuizModalProps) {
+  const { token } = useAuth();
+
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [questions, setQuestions] = useState<
+    Array<{ id: number; questionNumber: number; content: string; options: string[] }>
+  >([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
+  const [selectedAnswers, setSelectedAnswers] = useState<Array<number | undefined>>([]);
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
-  // Mock quiz questions
-  const questions: Question[] = [
-    {
-      id: '1',
-      question: '¿Cuál es la fórmula para resolver una ecuación de segundo grado?',
-      options: [
-        'x = -b ± √(b² - 4ac) / 2a',
-        'x = -b ± √(b² + 4ac) / 2a',
-        'x = b ± √(b² - 4ac) / 2a',
-        'x = -b ± √(b² - 4ac) / a'
-      ],
-      correctAnswer: 0,
-      explanation: 'La fórmula cuadrática es x = -b ± √(b² - 4ac) / 2a, donde a, b y c son los coeficientes de la ecuación ax² + bx + c = 0.'
-    },
-    {
-      id: '2',
-      question: '¿En qué año comenzó la Segunda Guerra Mundial?',
-      options: ['1938', '1939', '1940', '1941'],
-      correctAnswer: 1,
-      explanation: 'La Segunda Guerra Mundial comenzó el 1 de septiembre de 1939 con la invasión alemana de Polonia.'
-    },
-    {
-      id: '3',
-      question: '¿Cuál es el planeta más grande del sistema solar?',
-      options: ['Saturno', 'Neptuno', 'Júpiter', 'Urano'],
-      correctAnswer: 2,
-      explanation: 'Júpiter es el planeta más grande del sistema solar, con una masa mayor que todos los demás planetas combinados.'
-    },
-    {
-      id: '4',
-      question: '¿Quién escribió "Don Quijote de la Mancha"?',
-      options: ['Lope de Vega', 'Miguel de Cervantes', 'Francisco de Quevedo', 'Calderón de la Barca'],
-      correctAnswer: 1,
-      explanation: 'Miguel de Cervantes Saavedra escribió "Don Quijote de la Mancha", considerada una de las obras más importantes de la literatura española.'
-    },
-    {
-      id: '5',
-      question: '¿Cuál es el símbolo químico del oro?',
-      options: ['Go', 'Au', 'Ag', 'Or'],
-      correctAnswer: 1,
-      explanation: 'El símbolo químico del oro es Au, que proviene del latín "aurum".'
-    }
-  ];
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // === Cargar quiz diario ===
   useEffect(() => {
-    if (timeLeft > 0 && !showResults) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0) {
-      handleFinishQuiz();
-    }
-  }, [timeLeft, showResults]);
+    let cancelled = false;
 
-  const handleAnswerSelect = (answerIndex: number) => {
-    const newAnswers = [...selectedAnswers];
-    newAnswers[currentQuestion] = answerIndex;
-    setSelectedAnswers(newAnswers);
+    async function loadDaily() {
+      if (!token) {
+        setLoadError('No hay sesión activa (token). Inicia sesión para cargar el quiz.');
+        setLoading(false);
+        return;
+      }
+      if (classId === undefined || classId === null || classId === '') {
+        setLoadError('classId inválido o no provisto.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setLoadError(null);
+
+        // Primero verificar si ya se respondió el quiz diario de hoy
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Obtener el quiz diario para saber su ID
+          const quizData: QuizFullResponse = await quizService.getDailyQuiz(Number(classId));
+          
+          if (!quizData || !quizData.id) {
+            throw new Error('No se pudo obtener el quiz diario.');
+          }
+
+          // Verificar si ya hay respuestas para este quiz
+          const allAnswers = await quizService.getAllOwnAnswers(Number(classId));
+          const quizAlreadyAnswered = allAnswers.some(answer => answer.quizId === quizData.id);
+
+          if (quizAlreadyAnswered) {
+            if (!cancelled) {
+              setLoadError('Ya has completado el quiz diario de hoy. Vuelve mañana para un nuevo quiz.');
+            }
+            return;
+          }
+
+          // Si no está respondido, cargar las preguntas
+          if (!quizData || !Array.isArray(quizData.questions)) {
+            throw new Error('Respuesta inesperada del backend: faltan preguntas.');
+          }
+
+          const mapped = quizData.questions
+            .slice()
+            .sort((a, b) => a.questionNumber - b.questionNumber)
+            .map((q) => ({
+              id: q.id,
+              questionNumber: q.questionNumber,
+              content: q.content,
+              options: [q.optionA, q.optionB, q.optionC, q.optionD],
+            }));
+
+          if (!cancelled) {
+            setQuestions(mapped);
+            setSelectedAnswers(Array(mapped.length).fill(undefined));
+            setCurrentQuestion(0);
+            setSubmitError(null);
+          }
+        } catch (e: any) {
+          // Si el error es que ya está respondido, no hacer nada más
+          if (e?.message?.includes('Ya has completado')) {
+            return;
+          }
+          throw e;
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          // Verificar si el error es porque ya se respondió
+          if (e?.response?.status === 400 || e?.response?.status === 409) {
+            setLoadError('Ya has completado el quiz diario de hoy. Vuelve mañana para un nuevo quiz.');
+          } else {
+            setLoadError(e?.message || 'No se pudo cargar el quiz diario.');
+          }
+          console.error('Error getdailyquiz:', e);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadDaily();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, classId]);
+
+  const handleAnswerSelect = (optionIndex: number) => {
+    setSelectedAnswers((prev) => {
+      const copy = [...prev];
+      copy[currentQuestion] = optionIndex; // 0..3
+      return copy;
+    });
+    setSubmitError(null);
   };
 
   const handleNextQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    } else {
-      handleFinishQuiz();
-    }
+    if (selectedAnswers[currentQuestion] === undefined) return;
+    if (currentQuestion < questions.length - 1) setCurrentQuestion((q) => q + 1);
+    else void handleFinishQuiz();
   };
 
-  const handleFinishQuiz = () => {
-    let correctAnswers = 0;
-    selectedAnswers.forEach((answer, index) => {
-      if (answer === questions[index]?.correctAnswer) {
-        correctAnswers++;
-      }
-    });
+  const handleFinishQuiz = async () => {
+    setSubmitError(null);
 
-    const finalScore = Math.round((correctAnswers / questions.length) * 100);
+    // Verifica que todas estén respondidas (para no mandar undefined)
+    const firstUnanswered = selectedAnswers.findIndex((a) => a === undefined);
+    if (firstUnanswered !== -1) {
+      setCurrentQuestion(firstUnanswered);
+      setSubmitError('Responde todas las preguntas antes de enviar.');
+      return;
+    }
+
+    // === Payload EXACTO que pide tu backend ===
+    // { "answers": [0, 2, 1, ...] } donde A=0, B=1, C=2, D=3
+    const answersArray = (selectedAnswers as number[]).map((a) => Number(a));
+
+    let finalScore = 0;
+
+    try {
+      // Backend returns data directly, not wrapped in { code, message, body }
+      const response: AnswerDailyQuizResponse = await quizService.answerDailyQuiz(Number(classId), {
+        answers: answersArray,
+      });
+
+      // Calculate score as percentage
+      if (response.score != null && response.total != null) {
+        finalScore = Math.round((response.score / response.total) * 100);
+      } else if (response.score != null) {
+        finalScore = Math.max(0, Math.min(100, Math.round(response.score)));
+      } else {
+        // Fallback: calculate from correct array
+        const correctCount = response.correct?.filter((c) => c).length ?? 0;
+        finalScore = Math.round((correctCount / Math.max(1, answersArray.length)) * 100);
+      }
+    } catch (e: any) {
+      // Verificar si el error es porque ya se respondió el quiz
+      if (e?.response?.status === 400 || e?.response?.status === 409) {
+        setSubmitError('Ya has completado el quiz diario de hoy. No puedes responderlo dos veces.');
+        setShowResults(false);
+        return;
+      }
+      
+      const answered = answersArray.length;
+      finalScore = Math.round((answered / Math.max(1, questions.length)) * 100);
+      setSubmitError(`No se pudo comunicar con el servidor: ${e?.message || 'Error desconocido'}`);
+      console.error('Fallo al enviar answerdailyquiz:', e);
+    }
+
     setScore(finalScore);
     setShowResults(true);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const reward = (s: number) => Math.floor(100 * (s / 100) * streakMultiplier);
 
-  const calculateReward = () => {
-    const baseReward = 100;
-    return Math.floor(baseReward * (score / 100) * streakMultiplier);
-  };
+  // --- Render states ---
+  if (!token) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>Sesión requerida</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-red-600">No hay token disponible. Inicia sesión para acceder al quiz.</p>
+            <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Cerrar</Button></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>Cargando quiz diario…</CardTitle></CardHeader>
+          <CardContent className="text-sm text-muted-foreground">Conectando…</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loadError || questions.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl bg-white">
+          <CardHeader><CardTitle>{loadError ? 'Error' : 'Sin preguntas hoy'}</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {loadError ? <p className="text-sm text-red-600">{loadError}</p> : <p className="text-sm">Vuelve más tarde.</p>}
+            <div className="flex justify-end"><Button variant="outline" onClick={onClose}>Cerrar</Button></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (showResults) {
-    const reward = calculateReward();
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-2xl bg-white">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4">
-              {score >= 80 ? (
-                <Trophy className="h-16 w-16 text-yellow-500" />
-              ) : score >= 60 ? (
-                <Badge className="h-16 w-16 text-blue-500" />
-              ) : (
-                <Clock className="h-16 w-16 text-gray-500" />
-              )}
-            </div>
+            <div className="mx-auto mb-4"><Trophy className="h-16 w-16 text-yellow-500" /></div>
             <CardTitle className="text-2xl">
               {score >= 80 ? '¡Excelente trabajo!' : score >= 60 ? '¡Buen trabajo!' : '¡Sigue practicando!'}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
+            {submitError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-2">
+                {submitError}
+              </div>
+            )}
             <p className="text-lg">Tu puntuación: <span className="font-bold text-primary">{score}%</span></p>
-            
             <div className="bg-accent/20 p-4 rounded-lg">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Sparkles className="h-5 w-5 text-yellow-500" />
                 <span className="font-medium">Recompensa obtenida</span>
               </div>
-              <p className="text-2xl font-bold text-primary">{reward} KumoSoles</p>
+              <p className="text-2xl font-bold text-primary">{reward(score)} KumoSoles</p>
               {streakMultiplier > 1 && (
-                <Badge variant="secondary" className="mt-2">
-                  Bonus de racha: x{streakMultiplier}
-                </Badge>
+                <Badge variant="secondary" className="mt-2">Bonus de racha: x{streakMultiplier}</Badge>
               )}
             </div>
-
-            <div className="text-left bg-muted/20 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">Respuestas correctas:</h3>
-              <div className="space-y-2">
-                {questions.map((question, index) => (
-                  <div key={question.id} className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full ${
-                        selectedAnswers[index] === question.correctAnswer 
-                          ? 'bg-green-500' 
-                          : 'bg-red-500'
-                      }`}></div>
-                      <span>Pregunta {index + 1}</span>
-                    </div>
-                    {selectedAnswers[index] !== question.correctAnswer && (
-                      <p className="text-xs text-gray-600 ml-6 mt-1">
-                        Respuesta correcta: {question.options[question.correctAnswer]}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <Button
-              onClick={() => {
-                onComplete(score);
-                onClose();
-              }}
+              onClick={() => { onComplete(score); onClose(); }}
               className="w-full"
             >
               Continuar
@@ -190,44 +275,41 @@ export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalPr
     );
   }
 
+  const q = questions[currentQuestion];
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              Quiz Diario - Pregunta {currentQuestion + 1} de {questions.length}
+              Quiz Diario — Pregunta {currentQuestion + 1} de {questions.length}
             </CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full">
-                <Clock className="h-4 w-4" />
-                <span className="font-medium">{formatTime(timeLeft)}</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}><X className="h-4 w-4" /></Button>
           </div>
-          <Progress value={((currentQuestion + 1) / questions.length) * 100} className="h-2" />
+          <Progress value={progress} className="h-2" />
           {streakMultiplier > 1 && (
-            <Badge variant="secondary" className="w-fit">
-              Bonus de racha activo: x{streakMultiplier} KumoSoles
-            </Badge>
+            <Badge variant="secondary" className="w-fit">Bonus de racha: x{streakMultiplier} KumoSoles</Badge>
           )}
         </CardHeader>
         <CardContent className="space-y-6">
+          {submitError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {submitError}
+            </div>
+          )}
           <div>
-            <h3 className="text-lg font-medium mb-4">{questions[currentQuestion]?.question}</h3>
+            <h3 className="text-lg font-medium mb-4">{q.content}</h3>
             <div className="space-y-3">
-              {questions[currentQuestion]?.options.map((option, index) => (
+              {q.options.map((option, idx) => (
                 <Button
-                  key={index}
-                  variant={selectedAnswers[currentQuestion] === index ? "default" : "outline"}
+                  key={idx}
+                  variant={selectedAnswers[currentQuestion] === idx ? 'default' : 'outline'}
                   className="w-full text-left justify-start p-4 h-auto"
-                  onClick={() => handleAnswerSelect(index)}
+                  onClick={() => handleAnswerSelect(idx)}
                 >
-                  <span className="font-medium mr-3">{String.fromCharCode(65 + index)}.</span>
+                  <span className="font-medium mr-3">{String.fromCharCode(65 + idx)}.</span>
                   {option}
                 </Button>
               ))}
@@ -235,16 +317,8 @@ export function QuizModal({ onClose, onComplete, streakMultiplier }: QuizModalPr
           </div>
 
           <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleNextQuestion}
-              disabled={selectedAnswers[currentQuestion] === undefined}
-            >
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button onClick={handleNextQuestion} disabled={selectedAnswers[currentQuestion] === undefined}>
               {currentQuestion === questions.length - 1 ? 'Finalizar Quiz' : 'Siguiente Pregunta'}
             </Button>
           </div>
