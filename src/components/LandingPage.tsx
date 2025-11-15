@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { BookOpen, Users, Trophy, Sparkles, MessageCircle, BarChart3 } from 'lucide-react';
+import kumo_logo from '../assets/kumo_logo.svg';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -43,32 +44,45 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent via-muted to-secondary">
+      {/* Announcement Bar */}
+      <div className="bg-white/60 backdrop-blur border-b">
+        <div className="max-w-6xl mx-auto px-4 py-3 text-center">
+          <span className="text-sm md:text-base font-medium text-gray-800">Aprender no tiene un solo ritmo.</span>
+        </div>
+      </div>
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 py-16 sm:py-24">
           <div className="text-center">
             {/* Logo/Brand */}
-            <div className="mb-8">
+            <div className="mb-8 relative">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-primary rounded-3xl mb-6 shadow-2xl">
-                <span className="text-4xl">🐱</span>
+                <img src ={kumo_logo} alt = "logo"/>
               </div>
               <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
                 Kumo
               </h1>
-              <p className="text-2xl text-gray-700 mb-8">
-                Aprende Jugando
-              </p>
+              <p className="text-2xl text-gray-700 mb-2">Donde todos pueden aprender</p>
+            
+              
             </div>
 
             {/* Subtitle */}
-            <div className="max-w-3xl mx-auto mb-12">
+            <div className="max-w-3xl mx-auto mb-6">
               <p className="text-xl text-gray-600 leading-relaxed">
                 Aprende de manera divertida con 
                 <span className="font-semibold text-primary"> quizzes gamificados</span>, 
                 <span className="font-semibold text-secondary"> mascotas virtuales</span> y 
-                <span className="font-semibold text-accent-foreground"> un chatbot inteligente</span> 
+                <span className="font-semibold text-accent-foreground"> un chatbot inteligente </span> 
                 que te ayuda a entender mejor tus clases. ¡Gana KumoSoles y mantén tu racha!
               </p>
+            </div>
+            <div className="max-w-3xl mx-auto mb-12">
+              <blockquote className="rounded-2xl border bg-white/70 backdrop-blur px-6 py-4 text-left shadow">
+                <p className="text-base md:text-lg text-gray-800">
+                  Y Kumo está aquí para recordarnos que <span className="font-semibold">cada estudiante merece llegar a su propio tiempo.</span>
+                </p>
+              </blockquote>
             </div>
 
             {/* CTA Button */}
@@ -89,6 +103,18 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="absolute top-20 left-10 w-20 h-20 bg-primary/20 rounded-full blur-xl"></div>
         <div className="absolute top-40 right-20 w-32 h-32 bg-secondary/20 rounded-full blur-xl"></div>
         <div className="absolute bottom-20 left-1/4 w-24 h-24 bg-accent-foreground/10 rounded-full blur-xl"></div>
+      </div>
+
+      {/* Split Quotes Section */}
+      <div className="max-w-6xl mx-auto px-4 pt-8">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border bg-white/80 backdrop-blur p-6 shadow hover:shadow-md transition-shadow">
+            <p className="text-xl md:text-2xl font-semibold text-gray-900">No todos aprenden igual.</p>
+          </div>
+          <div className="rounded-2xl border bg-white/80 backdrop-blur p-6 shadow hover:shadow-md transition-shadow">
+            <p className="text-xl md:text-2xl font-semibold text-gray-900">Pero todos pueden aprender.</p>
+          </div>
+        </div>
       </div>
 
       {/* Features Section */}
@@ -135,7 +161,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               <div className="text-gray-600">Mejora en Retención</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-green-500 mb-2">50+</div>
+              <div className="text-4xl font-bold text-green-500 mb-2">1+</div>
               <div className="text-gray-600">Escuelas Usando Kumo</div>
             </div>
             <div>
@@ -155,6 +181,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <p className="text-xl mb-8 opacity-90">
             Únete a miles de estudiantes que ya están aprendiendo de forma más divertida 
             y efectiva con Kumo. ¡Gana recompensas mientras estudias!
+          </p>
+          <p className="text-base md:text-lg mb-8 opacity-95">
+            Tecnología y empatía para acompañar cada ritmo de aprendizaje.
           </p>
           <Button
             onClick={onGetStarted}

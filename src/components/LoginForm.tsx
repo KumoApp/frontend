@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ArrowLeft, BookOpen, Users, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth, InvalidCredentialsError, TokenInvalidError } from '../contexts/AuthContext';
 
 interface LoginFormProps {
@@ -11,7 +11,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onBack }: LoginFormProps) {
-  const { login, demoLogin, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -55,15 +55,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
     }
   };
 
-  const handleDemoLogin = (userType: 'student' | 'teacher') => {
-    setError('');
-    try {
-      const success = demoLogin(userType);
-      if (!success) setError('Error en el login de demostración');
-    } catch {
-      setError('Error en el login de demostración');
-    }
-  };
+  // Eliminado login de demostración
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted flex items-center justify-center p-4">
@@ -152,23 +144,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
               </Button>
             </form>
 
-            <div className="relative mt-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">O prueba con</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Button type="button" variant="outline" className="w-full" onClick={() => handleDemoLogin('student')} disabled={isLoading}>
-                <BookOpen className="h-4 w-4 mr-2" /> Demo Estudiante
-              </Button>
-              <Button type="button" variant="outline" className="w-full" onClick={() => handleDemoLogin('teacher')} disabled={isLoading}>
-                <Users className="h-4 w-4 mr-2" /> Demo Profesor
-              </Button>
-            </div>
+            {/* Eliminadas opciones de demostración */}
 
             <div className="text-center text-sm text-gray-600">
               <p>¿Necesitas ayuda? <button className="text-primary hover:underline">Contacta soporte</button></p>
