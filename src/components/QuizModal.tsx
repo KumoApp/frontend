@@ -45,7 +45,7 @@ export function QuizModal({
         setLoading(false);
         return;
       }
-      if (classId === undefined || classId === null || classId === '') {
+      if (classId === undefined || classId === null || String(classId).trim() === '') {
         setLoadError('classId inválido o no provisto.');
         setLoading(false);
         return;
@@ -61,14 +61,14 @@ export function QuizModal({
           today.setHours(0, 0, 0, 0);
           
           // Obtener el quiz diario para saber su ID
-          const quizData: QuizFullResponse = await quizService.getDailyQuiz(Number(classId));
+          const quizData: QuizFullResponse = await quizService.getDailyQuiz(classId);
           
           if (!quizData || !quizData.id) {
             throw new Error('No se pudo obtener el quiz diario.');
           }
 
           // Verificar si ya hay respuestas para este quiz
-          const allAnswers = await quizService.getAllOwnAnswers(Number(classId));
+          const allAnswers = await quizService.getAllOwnAnswers(classId);
           const quizAlreadyAnswered = allAnswers.some(answer => answer.quizId === quizData.id);
 
           if (quizAlreadyAnswered) {
@@ -162,7 +162,7 @@ export function QuizModal({
 
     try {
       // Backend returns data directly, not wrapped in { code, message, body }
-      const response: AnswerDailyQuizResponse = await quizService.answerDailyQuiz(Number(classId), {
+      const response: AnswerDailyQuizResponse = await quizService.answerDailyQuiz(classId, {
         answers: answersArray,
       });
 

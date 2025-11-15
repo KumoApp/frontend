@@ -57,6 +57,7 @@ interface ChatBotProps {
 }
 
 const BASE = 'http://localhost:3000';
+const CONVERSATIONS_BASE = BASE;
 
 function isLikelyJSON(text: string): any | null {
   const t = text?.trim();
@@ -172,9 +173,39 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
   const [stickBottom, setStickBottom] = useState(false);
 
   const headers = useMemo(
-    () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+    () => ({
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    }),
     [token]
   );
+
+  async function fetchJSON<T = any>(url: string, init?: RequestInit): Promise<T> {
+    const resp = await fetch(url, init);
+    const ct = resp.headers.get('content-type') || '';
+    if (!resp.ok) {
+      let detail = '';
+      try {
+        if (ct.includes('application/json')) {
+          const errJson = await resp.json();
+          detail = errJson?.message || errJson?.error || JSON.stringify(errJson);
+        } else {
+          detail = (await resp.text()).slice(0, 200);
+        }
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
+    }
+    if (!ct.includes('application/json')) {
+      // Puede ser 204 o un HTML si el backend está mal roteado
+      const text = await resp.text();
+      throw new Error(`Respuesta no JSON del servidor (status ${resp.status}). Inicio: ${text.slice(0, 60)}`);
+    }
+    const json = await resp.json();
+    return (json?.body ?? json) as T;
+  }
 
   const pushSystemError = (text: string) => {
     setMessages(prev => [
@@ -194,10 +225,14 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
         setConversations([]);
         setCurrentConvId(null);
         setMessages([]);
-        const resp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, { headers });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status} al listar conversaciones`);
-        const json = await resp.json();
-        const list: ApiConversationSmall[] = json?.body ?? json ?? [];
+        const rawList = await fetchJSON<any>(`${CONVERSATIONS_BASE}/conversations/classes/${selectedClass.id}`, { headers });
+        const list: ApiConversationSmall[] = Array.isArray(rawList)
+          ? rawList
+          : Array.isArray(rawList?.data)
+            ? rawList.data
+            : rawList
+              ? [rawList]
+              : [];
         if (!cancelled) {
           setConversations(list);
           if (list.length > 0) setCurrentConvId(list[0].id);
@@ -221,10 +256,7 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
       try {
         setErrorMsg(null);
         setLoadingConv(true);
-        const resp = await fetch(`${BASE}/conversations/${convId}`, { headers });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status} al cargar conversación #${convId}`);
-        const json = await resp.json();
-        const conv: ApiConversation = json?.body ?? json;
+        const conv = await fetchJSON<ApiConversation>(`${CONVERSATIONS_BASE}/conversations/${convId}`, { headers });
 
         setCurrentConvTitle(conv.title ?? '');
         const mapped: Message[] = (conv.messages ?? []).map((m) => ({
@@ -283,23 +315,14 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
     setIsTyping(true);
 
     try {
-      const resp = await fetch(`${BASE}/conversations/${currentConvId}/messages`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ content: userMessage.text })
-      });
-
-      if (!resp.ok) {
-        let backendErr = '';
-        try {
-          const errJson = await resp.json();
-          backendErr = errJson?.message || errJson?.error || '';
-        } catch { /* ignore */ }
-        throw new Error(backendErr || `HTTP ${resp.status} al enviar mensaje`);
-      }
-
-      const json = await resp.json();
-      const data: SendMessageResponse = json?.body ?? json;
+      const data = await fetchJSON<SendMessageResponse>(
+        `${CONVERSATIONS_BASE}/conversations/${currentConvId}/messages`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ content: userMessage.text })
+        }
+      );
 
       const botMessage: Message = {
         id: `b-${data.responseMessageId}`,
@@ -324,27 +347,25 @@ export function ChatBot({ onBack, selectedClass, classes, onClassChange }: ChatB
     try {
       setErrorMsg(null);
       setCreating(true);
-      const resp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ title: newTitle.trim() })
-      });
-      if (!resp.ok) {
-        let backendErr = '';
-        try {
-          const errJson = await resp.json();
-          backendErr = errJson?.message || errJson?.error || '';
-        } catch { /* noop */ }
-        throw new Error(backendErr || `HTTP ${resp.status} al crear conversación`);
-      }
-      const json = await resp.json();
-      const { id } = json?.body ?? json;
+      const created = await fetchJSON<{ id: number }>(
+        `${CONVERSATIONS_BASE}/conversations/classes/${selectedClass.id}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ title: newTitle.trim() })
+        }
+      );
+      const { id } = created;
       setNewTitle('');
 
-      const listResp = await fetch(`${BASE}/conversations/classes/${selectedClass.id}`, { headers });
-      if (!listResp.ok) throw new Error(`HTTP ${listResp.status} al refrescar lista`);
-      const listJson = await listResp.json();
-      const list: ApiConversationSmall[] = listJson?.body ?? listJson ?? [];
+      const rawList = await fetchJSON<any>(`${CONVERSATIONS_BASE}/conversations/classes/${selectedClass.id}`, { headers });
+      const list: ApiConversationSmall[] = Array.isArray(rawList)
+        ? rawList
+        : Array.isArray(rawList?.data)
+          ? rawList.data
+          : rawList
+            ? [rawList]
+            : [];
       setConversations(list);
       setCurrentConvId(id);
     } catch (e: any) {

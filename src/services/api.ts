@@ -132,9 +132,10 @@ export interface AnswerDailyQuizResponse {
 
 export const quizService = {
   // GET /quizzes/classes/:classId - GetAllQuizzesbyId
-  async getQuizzesFromClass(classId: number): Promise<QuizSmallResponse[]> {
-    console.log(`[QuizService] GET /quizzes/classes/${classId}`);
-    const response = await apiClient.get<any>(`/quizzes/classes/${classId}`);
+  async getQuizzesFromClass(classId: string | number): Promise<QuizSmallResponse[]> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] GET /quizzes/classes/${id}`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${id}`);
     console.log(`[QuizService] Response:`, response.data);
     // Backend puede devolver directamente un array o envuelto en { body: [...] }
     const data = response.data;
@@ -164,9 +165,10 @@ export const quizService = {
   },
 
   // GET /quizzes/classes/:classId/daily - GetDailyQuiz
-  async getDailyQuiz(classId: number): Promise<QuizFullResponse> {
-    console.log(`[QuizService] GET /quizzes/classes/${classId}/daily`);
-    const response = await apiClient.get<any>(`/quizzes/classes/${classId}/daily`);
+  async getDailyQuiz(classId: string | number): Promise<QuizFullResponse> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] GET /quizzes/classes/${id}/daily`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${id}/daily`);
     console.log(`[QuizService] Response:`, response.data);
     const data = response.data;
     // Manejar respuesta directa o envuelta
@@ -174,9 +176,10 @@ export const quizService = {
   },
 
   // GET /quizzes/classes/:classId/answers - GetAllOwnAnswers
-  async getAllOwnAnswers(classId: number): Promise<QuizAnswerSmallResponse[]> {
-    console.log(`[QuizService] GET /quizzes/classes/${classId}/answers`);
-    const response = await apiClient.get<any>(`/quizzes/classes/${classId}/answers`);
+  async getAllOwnAnswers(classId: string | number): Promise<QuizAnswerSmallResponse[]> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] GET /quizzes/classes/${id}/answers`);
+    const response = await apiClient.get<any>(`/quizzes/classes/${id}/answers`);
     console.log(`[QuizService] Response:`, response.data);
     const data = response.data;
     // Backend puede devolver directamente un array o envuelto en { body: [...] }
@@ -206,10 +209,11 @@ export const quizService = {
   },
 
   // POST /quizzes/classes/:classId/daily/answer - AnswerDailyQuiz
-  async answerDailyQuiz(classId: number, answers: AnswerDailyQuizRequest): Promise<AnswerDailyQuizResponse> {
-    console.log(`[QuizService] POST /quizzes/classes/${classId}/daily/answer`, answers);
+  async answerDailyQuiz(classId: string | number, answers: AnswerDailyQuizRequest): Promise<AnswerDailyQuizResponse> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] POST /quizzes/classes/${id}/daily/answer`, answers);
     const response = await apiClient.post<any>(
-      `/quizzes/classes/${classId}/daily/answer`,
+      `/quizzes/classes/${id}/daily/answer`,
       answers
     );
     console.log(`[QuizService] Response:`, response.data);

@@ -56,7 +56,8 @@ export function QuizHistory({ onBack, classId, studentName }: QuizHistoryProps) 
     let cancelled = false;
     async function loadAll() {
       // Validar que classId sea válido
-      if (!classId || classId === '' || classId === null || classId === undefined) {
+      const hasValidClass = classId !== null && classId !== undefined && String(classId).trim() !== '';
+      if (!hasValidClass) {
         setLoadError('No se ha seleccionado una clase. Por favor, selecciona una clase primero.');
         setLoading(false);
         return;
@@ -67,14 +68,14 @@ export function QuizHistory({ onBack, classId, studentName }: QuizHistoryProps) 
         setLoadError(null);
 
         // 1) Quizzes de la clase - Backend returns data directly
-        const quizzesList: QuizSmallResponse[] = await quizService.getQuizzesFromClass(Number(classId));
+        const quizzesList: QuizSmallResponse[] = await quizService.getQuizzesFromClass(classId);
         // Asegurar que sea un array
         const safeQuizzesList = Array.isArray(quizzesList) ? quizzesList : [];
         if (!cancelled) setQuizzes(safeQuizzesList);
 
         // 2) Tus respuestas en la clase - Backend returns data directly
         try {
-          const answersList: QuizAnswerSmallResponse[] = await quizService.getAllOwnAnswers(Number(classId));
+          const answersList: QuizAnswerSmallResponse[] = await quizService.getAllOwnAnswers(classId);
           // Asegurar que sea un array
           const safeAnswersList = Array.isArray(answersList) ? answersList : [];
           if (!cancelled) {
@@ -96,7 +97,7 @@ export function QuizHistory({ onBack, classId, studentName }: QuizHistoryProps) 
         if (!cancelled) setLoading(false);
       }
     }
-    if (token && classId) loadAll();
+    if (token && classId !== null && classId !== undefined && String(classId).trim() !== '') loadAll();
     return () => {
       cancelled = true;
     };
