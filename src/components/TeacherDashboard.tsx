@@ -113,8 +113,15 @@ export function TeacherDashboard({ teacherData, onLogout }: TeacherDashboardProp
   const [uploadingFile, setUploadingFile] = useState(false);
   const [viewingStudentHistory, setViewingStudentHistory] = useState<string | null>(null);
 
+  // Crear nueva clase
+  const [createName, setCreateName] = useState('');
+  const [createSubject, setCreateSubject] = useState('');
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+
   const headers = useMemo(
-    () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+    () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }),
     [token]
   );
 
@@ -212,6 +219,66 @@ export function TeacherDashboard({ teacherData, onLogout }: TeacherDashboardProp
     }
     return () => { cancelled = true; };
   }, [headers, selectedClass?.id]);
+
+  async function handleCreateClass(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    setCreateSuccess(null);
+    const payload: any = { name: createName.trim(), students: [] as Array<string | number> };
+    if (createSubject.trim()) payload.subject = createSubject.trim();
+    if (!payload.name) {
+      setCreateError('El nombre de la clase es obligatorio.');
+      return;
+    }
+    try {
+      setCreatingClass(true);
+      const resp = await fetch(`${BASE}/classes/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const ct = resp.headers.get('content-type') || '';
+      if (!resp.ok) {
+        let detail = '';
+        try {
+          if (ct.includes('application/json')) {
+            const errJson = await resp.json();
+            detail = errJson?.message || errJson?.error || JSON.stringify(errJson);
+          } else {
+            detail = (await resp.text()).slice(0, 140);
+          }
+        } catch {}
+        throw new Error(`HTTP ${resp.status} ${resp.statusText}${detail ? ` - ${detail}` : ''}`);
+      }
+      const json = ct.includes('application/json') ? await resp.json() : null;
+      const created = (json?.body ?? json) || {};
+      setCreateSuccess('Clase creada correctamente.');
+      setCreateName('');
+      setCreateSubject('');
+
+      // Refrescar lista de clases
+      try {
+        const listResp = await fetch(CLASSES_LIST_URL, { headers });
+        if (listResp.ok) {
+          const listJson = await listResp.json();
+          const list = (listJson?.body ?? listJson ?? []) as Array<{ id: string | number; name: string; subject?: string; teacher?: any }>;
+          const mapped: ClassInfo[] = list.map((c) => {
+            const idStr = String(c.id);
+            const teacherName = typeof c.teacher === 'string' ? c.teacher : c.teacher?.name ?? '';
+            return { id: idStr, name: c.name, subject: c.subject, teacher: teacherName, color: colorFromId(idStr) };
+          });
+          setClasses(mapped);
+          const createdId = created?.id ? String(created.id) : null;
+          const toSelect = createdId ? mapped.find((c) => c.id === createdId) : mapped.find((c) => c.name === payload.name);
+          if (toSelect) setSelectedClass(toSelect);
+        }
+      } catch {}
+    } catch (err: any) {
+      setCreateError(err?.message || 'No se pudo crear la clase.');
+    } finally {
+      setCreatingClass(false);
+    }
+  }
 
   // ====== Materiales (demo local; puedes sustituir por tu API) ======
   const [materials, setMaterials] = useState<Material[]>([
@@ -344,6 +411,29 @@ export function TeacherDashboard({ teacherData, onLogout }: TeacherDashboardProp
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Crear nueva clase */}
+        <Card className="bg-white/90 backdrop-blur mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Crear nueva clase</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateClass} className="grid md:grid-cols-3 gap-3 items-end">
+              <div>
+                <Label htmlFor="class-name">Nombre</Label>
+                <Input id="class-name" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Ej. Matemática 1" />
+              </div>
+              <div>
+                <Label htmlFor="class-subject">Materia (opcional)</Label>
+                <Input id="class-subject" value={createSubject} onChange={(e) => setCreateSubject(e.target.value)} placeholder="Ej. Álgebra" />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={creatingClass}>{creatingClass ? 'Creando…' : 'Crear clase'}</Button>
+                {createSuccess && <span className="text-sm text-green-600 self-center">{createSuccess}</span>}
+                {createError && <span className="text-sm text-red-600 self-center">{createError}</span>}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
         {/* Banner de error si falla /classes/{id} */}
         {classDetailError && (
           <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 flex items-center gap-2">
