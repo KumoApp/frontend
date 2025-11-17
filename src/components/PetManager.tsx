@@ -1,15 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Badge } from './ui/badge';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import { ArrowLeft, Heart, Zap, TrendingUp, Apple, Plus } from 'lucide-react';
-import { petsService } from '../services/api';
-import { Pet, CreatePetData } from '../types/pet';
-import { Progress } from './ui/progress';
+import React, { useEffect, useState } from "react";
+import { Button } from "./ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { ArrowLeft, Heart, Zap, TrendingUp, Apple, Plus } from "lucide-react";
+import { petsService } from "../services/api";
+import { Pet, CreatePetData } from "../types/pet";
+import { Progress } from "./ui/progress";
 
 interface PetManagerProps {
   onBack: () => void;
@@ -17,11 +36,11 @@ interface PetManagerProps {
 }
 
 const PET_TYPES = [
-  { value: 'DOG', label: 'Perro', emoji: '🐕' },
-  { value: 'CAT', label: 'Gato', emoji: '🐱' },
-  { value: 'RABBIT', label: 'Conejo', emoji: '🐰' },
-  { value: 'BIRD', label: 'Pájaro', emoji: '🐦' },
-  { value: 'HAMSTER', label: 'Hámster', emoji: '🐹' },
+  { value: "DOG", label: "Perro", emoji: "🐕" },
+  { value: "CAT", label: "Gato", emoji: "🐱" },
+  { value: "RABBIT", label: "Conejo", emoji: "🐰" },
+  { value: "BIRD", label: "Pájaro", emoji: "🐦" },
+  { value: "HAMSTER", label: "Hámster", emoji: "🐹" },
 ];
 
 export function PetManager({ onBack, classId }: PetManagerProps) {
@@ -33,8 +52,8 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
   const [feeding, setFeeding] = useState(false);
 
   // Form para crear mascota
-  const [newPetName, setNewPetName] = useState('');
-  const [newPetType, setNewPetType] = useState('DOG');
+  const [newPetName, setNewPetName] = useState("");
+  const [newPetType, setNewPetType] = useState("DOG");
 
   useEffect(() => {
     loadMyPet();
@@ -50,8 +69,8 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
       if (petData && petData.id) {
         setMyPet({
           id: petData.id,
-          name: petData.name || 'Mascota',
-          type: petData.type || 'DOG',
+          name: petData.name || "Mascota",
+          type: petData.type || "DOG",
           level: petData.level ?? 1,
           experience: petData.experience ?? 0,
           hunger: petData.hunger ?? 100,
@@ -67,12 +86,12 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
         setMyPet(null);
       }
     } catch (e: any) {
-      console.error('Error cargando mascota:', e);
+      console.error("Error cargando mascota:", e);
       // Si el error es 404, significa que no tiene mascota
-      if (e?.response?.status === 404 || e?.message?.includes('404')) {
+      if (e?.response?.status === 404 || e?.message?.includes("404")) {
         setMyPet(null);
       } else {
-        setError('No se pudo cargar tu mascota.');
+        setError("No se pudo cargar tu mascota.");
       }
     } finally {
       setLoading(false);
@@ -80,11 +99,18 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
   }
 
   async function handleCreatePet() {
+    console.log("[PetManager] handleCreatePet iniciado");
+    console.log("[PetManager] newPetName:", newPetName);
+    console.log("[PetManager] newPetType:", newPetType);
+    console.log("[PetManager] classId:", classId);
+
     if (!newPetName.trim()) {
-      alert('Por favor ingresa un nombre para tu mascota');
+      console.log("[PetManager] ❌ Nombre vacío");
+      alert("Por favor ingresa un nombre para tu mascota");
       return;
     }
 
+    console.log("[PetManager] ✅ Nombre válido, iniciando creación...");
     setCreating(true);
     try {
       const petData: CreatePetData = {
@@ -92,19 +118,36 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
         type: newPetType,
       };
 
+      console.log("[PetManager] Datos a enviar:", petData);
+      console.log("[PetManager] Llamando a petsService.createPet...");
+
       const response = await petsService.createPet(classId, petData);
-      console.log('Mascota creada:', response);
+
+      console.log("[PetManager] ✅ Mascota creada exitosamente");
+      console.log("[PetManager] Respuesta:", response);
 
       setShowCreateDialog(false);
-      setNewPetName('');
-      setNewPetType('DOG');
+      setNewPetName("");
+      setNewPetType("DOG");
 
+      console.log("[PetManager] Recargando mascota...");
       // Recargar mascota
       await loadMyPet();
+      console.log("[PetManager] ✅ Mascota recargada");
     } catch (err: any) {
-      console.error('Error creando mascota:', err);
-      alert('Error al crear mascota: ' + (err.message || 'Error desconocido'));
+      console.error("[PetManager] ❌ Error creando mascota:", err);
+      console.error(
+        "[PetManager] Error completo:",
+        JSON.stringify(err, null, 2),
+      );
+      console.error("[PetManager] Error response:", err?.response);
+      console.error("[PetManager] Error response data:", err?.response?.data);
+      alert(
+        "Error al crear mascota: " +
+          (err?.response?.data?.message || err.message || "Error desconocido"),
+      );
     } finally {
+      console.log("[PetManager] setCreating(false)");
       setCreating(false);
     }
   }
@@ -115,30 +158,36 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
     setFeeding(true);
     try {
       const response = await petsService.feedPet(myPet.id);
-      console.log('Mascota alimentada:', response);
+      console.log("Mascota alimentada:", response);
 
       // Recargar mascota para ver los cambios
       await loadMyPet();
 
-      alert('¡Has alimentado a tu mascota!');
+      alert("¡Has alimentado a tu mascota!");
     } catch (err: any) {
-      console.error('Error alimentando mascota:', err);
-      alert('Error al alimentar mascota: ' + (err.message || 'Error desconocido'));
+      console.error("Error alimentando mascota:", err);
+      alert(
+        "Error al alimentar mascota: " + (err.message || "Error desconocido"),
+      );
     } finally {
       setFeeding(false);
     }
   }
 
   const getPetEmoji = (type: string) => {
-    const petType = PET_TYPES.find(pt => pt.value === type);
-    return petType?.emoji || '🐾';
+    const petType = PET_TYPES.find((pt) => pt.value === type);
+    return petType?.emoji || "🐾";
   };
 
   const getStatColor = (value: number) => {
-    if (value >= 70) return 'bg-green-500';
-    if (value >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (value >= 70) return "bg-green-500";
+    if (value >= 40) return "bg-yellow-500";
+    return "bg-red-500";
   };
+
+  console.log("[PetManager] Render - showCreateDialog:", showCreateDialog);
+  console.log("[PetManager] Render - myPet:", myPet);
+  console.log("[PetManager] Render - loading:", loading);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
@@ -173,13 +222,18 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                   <div>
                     <CardTitle className="text-2xl">{myPet.name}</CardTitle>
                     <CardDescription>
-                      {PET_TYPES.find(pt => pt.value === myPet.type)?.label || myPet.type}
+                      {PET_TYPES.find((pt) => pt.value === myPet.type)?.label ||
+                        myPet.type}
                     </CardDescription>
                   </div>
                   <div className="text-center">
                     <div className="text-6xl">
                       {myPet.imageUrl ? (
-                        <img src={myPet.imageUrl} alt={myPet.name} className="w-20 h-20 object-contain" />
+                        <img
+                          src={myPet.imageUrl}
+                          alt={myPet.name}
+                          className="w-20 h-20 object-contain"
+                        />
                       ) : (
                         getPetEmoji(myPet.type)
                       )}
@@ -203,7 +257,10 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                         </span>
                         <span>{myPet.health}%</span>
                       </div>
-                      <Progress value={myPet.health} className={`h-2 ${getStatColor(myPet.health)}`} />
+                      <Progress
+                        value={myPet.health}
+                        className={`h-2 ${getStatColor(myPet.health)}`}
+                      />
                     </div>
                   )}
 
@@ -216,7 +273,10 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                         </span>
                         <span>{myPet.hunger}%</span>
                       </div>
-                      <Progress value={myPet.hunger} className={`h-2 ${getStatColor(myPet.hunger)}`} />
+                      <Progress
+                        value={myPet.hunger}
+                        className={`h-2 ${getStatColor(myPet.hunger)}`}
+                      />
                     </div>
                   )}
 
@@ -229,7 +289,10 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                         </span>
                         <span>{myPet.happiness}%</span>
                       </div>
-                      <Progress value={myPet.happiness} className={`h-2 ${getStatColor(myPet.happiness)}`} />
+                      <Progress
+                        value={myPet.happiness}
+                        className={`h-2 ${getStatColor(myPet.happiness)}`}
+                      />
                     </div>
                   )}
 
@@ -242,15 +305,22 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                         </span>
                         <span>{myPet.experience} XP</span>
                       </div>
-                      <Progress value={myPet.experience % 100} className="h-2" />
+                      <Progress
+                        value={myPet.experience % 100}
+                        className="h-2"
+                      />
                     </div>
                   )}
 
                   {/* Acciones */}
                   <div className="flex gap-2 pt-4">
-                    <Button onClick={handleFeedPet} disabled={feeding} className="flex-1">
+                    <Button
+                      onClick={handleFeedPet}
+                      disabled={feeding}
+                      className="flex-1"
+                    >
                       <Apple className="h-4 w-4 mr-2" />
-                      {feeding ? 'Alimentando...' : 'Alimentar'}
+                      {feeding ? "Alimentando..." : "Alimentar"}
                     </Button>
                   </div>
                 </div>
@@ -266,7 +336,11 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {myPet.equippedItems.map((item) => (
-                      <Badge key={item.id} variant="outline" className="justify-center p-2">
+                      <Badge
+                        key={item.id}
+                        variant="outline"
+                        className="justify-center p-2"
+                      >
                         {item.name}
                       </Badge>
                     ))}
@@ -275,7 +349,7 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
               </Card>
             )}
           </>
-        ) : (
+        ) : !showCreateDialog ? (
           // No tiene mascota - mostrar botón para crear
           <Card className="bg-white/90 backdrop-blur">
             <CardContent className="p-8 text-center">
@@ -284,39 +358,52 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
               <p className="text-muted-foreground mb-6">
                 Crea tu primera mascota para comenzar tu aventura
               </p>
-              <Button onClick={() => setShowCreateDialog(true)} size="lg">
+              <Button
+                onClick={() => {
+                  console.log(
+                    '[PetManager] Botón "Crear Mi Mascota" presionado',
+                  );
+                  console.log(
+                    "[PetManager] showCreateDialog antes:",
+                    showCreateDialog,
+                  );
+                  setShowCreateDialog(true);
+                  console.log(
+                    "[PetManager] setShowCreateDialog(true) ejecutado",
+                  );
+                }}
+                size="lg"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Crear Mi Mascota
               </Button>
             </CardContent>
           </Card>
-        )}
-
-        {/* Diálogo de crear mascota */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Crear tu mascota</DialogTitle>
-              <DialogDescription>
+        ) : (
+          // Formulario de crear mascota
+          <Card className="bg-white/90 backdrop-blur">
+            <CardHeader>
+              <CardTitle>Crear tu mascota</CardTitle>
+              <CardDescription>
                 Elige un nombre y tipo para tu nueva mascota
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="pet-name">Nombre</Label>
+                <Label htmlFor="pet-name-input">Nombre</Label>
                 <Input
-                  id="pet-name"
-                  placeholder="Ej: Kumo"
+                  id="pet-name-input"
+                  placeholder="Ej: Shupa"
                   value={newPetName}
                   onChange={(e) => setNewPetName(e.target.value)}
+                  className="mt-1"
                 />
               </div>
 
               <div>
-                <Label htmlFor="pet-type">Tipo de mascota</Label>
+                <Label htmlFor="pet-type-select">Tipo de mascota</Label>
                 <Select value={newPetType} onValueChange={setNewPetType}>
-                  <SelectTrigger id="pet-type">
+                  <SelectTrigger id="pet-type-select" className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,23 +420,34 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
               </div>
 
               <div className="text-center p-4 bg-accent/20 rounded-lg">
-                <div className="text-6xl mb-2">
-                  {getPetEmoji(newPetType)}
-                </div>
-                <p className="font-medium">{newPetName || 'Tu mascota'}</p>
+                <div className="text-6xl mb-2">{getPetEmoji(newPetType)}</div>
+                <p className="font-medium">{newPetName || "Tu mascota"}</p>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creating}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreatePet} disabled={creating || !newPetName.trim()}>
-                {creating ? 'Creando...' : 'Crear Mascota'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateDialog(false);
+                    setNewPetName("");
+                    setNewPetType("DOG");
+                  }}
+                  disabled={creating}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreatePet}
+                  disabled={creating || !newPetName.trim()}
+                  className="flex-1"
+                >
+                  {creating ? "Creando..." : "Crear Mascota"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

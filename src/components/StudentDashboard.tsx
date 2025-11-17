@@ -29,6 +29,7 @@ import { QuizHistory } from "./QuizHistory";
 import { Shop } from "./Shop";
 import { Inventory } from "./Inventory";
 import { PetManager } from "./PetManager";
+import { ClassroomPets } from "./ClassroomPets";
 import { useAuth } from "../contexts/AuthContext";
 import { userService, UserInClassData } from "../services/api";
 
@@ -86,6 +87,7 @@ export function StudentDashboard({
     | "shop"
     | "inventory"
     | "pet-manager"
+    | "classroom"
   >("dashboard");
 
   const [studentData, setStudentData] = useState<StudentData>({
@@ -479,6 +481,31 @@ export function StudentDashboard({
     );
   }
 
+  if (activeView === "classroom") {
+    if (!selectedClass) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
+          <div className="max-w-4xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveView("dashboard")}>
+              Volver
+            </Button>
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                Selecciona una clase para ver las mascotas del salón.
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <ClassroomPets
+        onBack={() => setActiveView("dashboard")}
+        classId={selectedClass.id}
+      />
+    );
+  }
+
   // Vista principal (dashboard)
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent to-muted p-4">
@@ -695,6 +722,21 @@ export function StudentDashboard({
           >
             <Sparkles className="h-8 w-8" />
             <span>Mi Mascota</span>
+          </Button>
+
+          <Button
+            onClick={() => setActiveView("classroom")}
+            variant="outline"
+            className="h-24 flex flex-col gap-2"
+            disabled={!selectedClass}
+            title={
+              !selectedClass
+                ? "Selecciona una clase primero"
+                : "Ver mascotas del salón"
+            }
+          >
+            <Users className="h-8 w-8" />
+            <span>Mascotas del Salón</span>
           </Button>
         </div>
 
