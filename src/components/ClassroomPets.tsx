@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ArrowLeft, Users, Trophy, Star, Loader2 } from "lucide-react";
-import { petsService } from "../services/api";
+import { petsService, classService } from "../services/api";
 
 interface Pet {
   id: number;
@@ -29,17 +29,29 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [className, setClassName] = useState<string>("");
 
   useEffect(() => {
-    loadClassroomPets();
+    loadClassroomData();
   }, [classId]);
 
-  async function loadClassroomPets() {
+  async function loadClassroomData() {
     try {
       setLoading(true);
       setError(null);
-      console.log(`[ClassroomPets] Cargando mascotas de la clase ${classId}`);
+      console.log(`[ClassroomPets] Cargando datos de la clase ${classId}`);
 
+      // Obtener información de la clase
+      const classResponse = await classService.getClass(classId);
+      console.log("[ClassroomPets] Información de clase:", classResponse);
+
+      const classData =
+        classResponse?.body ?? classResponse?.data ?? classResponse;
+      if (classData?.name) {
+        setClassName(classData.name);
+      }
+
+      // Obtener mascotas de la clase
       const response = await petsService.getAllPetsFromClass(classId);
       console.log("[ClassroomPets] Respuesta:", response);
 
@@ -143,7 +155,7 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-6 w-6" />
-                Mascotas del Salón
+                Mascotas del Salón{className && ` - ${className}`}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Total de mascotas: {pets.length}

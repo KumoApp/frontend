@@ -122,6 +122,14 @@ export const classService = {
     );
     return response.data;
   },
+  // GET /classes/:classId - GetClass
+  async getClass(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[ClassService] GET /classes/${id}`);
+    const response = await apiClient.get<any>(`/classes/${id}`);
+    console.log(`[ClassService] Response:`, response.data);
+    return response.data;
+  },
 };
 
 // Quiz types based on backend DTOs
@@ -337,6 +345,15 @@ export interface PurchaseShopItemRequest {
   itemId: number;
 }
 
+export interface CreateShopItemRequest {
+  name: string;
+  description?: string;
+  price: number;
+  type?: string;
+  category?: string;
+  stock?: number;
+}
+
 export const shopService = {
   // GET /shop/ - GetShopItems
   async getShopItems(): Promise<any> {
@@ -368,6 +385,50 @@ export const shopService = {
       `/shop/classes/${id}/purchase`,
       requestBody,
     );
+    console.log(`[ShopService] Response:`, response.data);
+    return response.data;
+  },
+
+  // POST /shop/items - CreateShopItem (requires system authentication)
+  async createShopItem(
+    itemData: CreateShopItemRequest,
+    imageFile: File,
+    systemToken: string,
+  ): Promise<any> {
+    console.log(`[ShopService] POST /shop/items`, itemData);
+
+    // Crear FormData para enviar imagen + datos
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("name", itemData.name);
+    formData.append("price", itemData.price.toString());
+
+    // Campos opcionales
+    if (itemData.description) {
+      formData.append("description", itemData.description);
+    }
+    if (itemData.type) {
+      formData.append("type", itemData.type);
+    }
+    if (itemData.category) {
+      formData.append("category", itemData.category);
+    }
+    if (itemData.stock !== undefined && itemData.stock !== null) {
+      formData.append("stock", itemData.stock.toString());
+    }
+
+    console.log(`[ShopService] Sending FormData with image:`, imageFile.name);
+    console.log(`[ShopService] FormData entries:`);
+    for (let pair of formData.entries()) {
+      console.log(`  ${pair[0]}:`, pair[1]);
+    }
+
+    const response = await apiClient.post<any>("/shop/items", formData, {
+      headers: {
+        Authorization: `Bearer ${systemToken}`,
+        // No especificar Content-Type manualmente, axios lo hará automáticamente con boundary correcto
+      },
+    });
     console.log(`[ShopService] Response:`, response.data);
     return response.data;
   },
