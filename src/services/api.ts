@@ -1,26 +1,31 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { ApiResponse, LoginRequest, LoginResponse, CheckTokenResponse } from '../types/auth';
+import axios, { AxiosInstance, AxiosResponse } from "axios";
+import {
+  ApiResponse,
+  LoginRequest,
+  LoginResponse,
+  CheckTokenResponse,
+} from "../types/auth";
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = "http://localhost:3000";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     if (token) {
       config.headers = config.headers ?? {};
       (config.headers as any).Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 apiClient.interceptors.response.use(
@@ -28,51 +33,93 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // limpiamos credenciales pero NO redirigimos aquí
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_data");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/login', credentials);
+    const response = await apiClient.post<ApiResponse<LoginResponse>>(
+      "/auth/login",
+      credentials,
+    );
     return response.data;
   },
 
   async checkToken(token: string): Promise<ApiResponse<CheckTokenResponse>> {
-    const response = await apiClient.post<ApiResponse<CheckTokenResponse>>('/auth/check', { token });
+    const response = await apiClient.post<ApiResponse<CheckTokenResponse>>(
+      "/auth/check",
+      { token },
+    );
     return response.data;
   },
 };
 
+// User data in class response
+export interface UserInClassData {
+  id: number;
+  email: string;
+  name: string;
+  lastname: string;
+  username: string;
+  level: number;
+  coins: number;
+  streak: number;
+}
+
 export const userService = {
   async getAllUsers(): Promise<ApiResponse<any[]>> {
-    const response = await apiClient.get<ApiResponse<any[]>>('/users/getAll');
+    const response = await apiClient.get<ApiResponse<any[]>>("/users/getAll");
     return response.data;
   },
   async createTeacher(userData: any): Promise<ApiResponse<any>> {
-    const response = await apiClient.post<ApiResponse<any>>('/users/create/teacher', userData);
+    const response = await apiClient.post<ApiResponse<any>>(
+      "/users/create/teacher",
+      userData,
+    );
     return response.data;
   },
   async createStudent(userData: any): Promise<ApiResponse<any>> {
-    const response = await apiClient.post<ApiResponse<any>>('/users/create/student', userData);
+    const response = await apiClient.post<ApiResponse<any>>(
+      "/users/create/student",
+      userData,
+    );
     return response.data;
   },
   async createAdmin(userData: any): Promise<ApiResponse<any>> {
-    const response = await apiClient.post<ApiResponse<any>>('/users/create/admin', userData);
+    const response = await apiClient.post<ApiResponse<any>>(
+      "/users/create/admin",
+      userData,
+    );
+    return response.data;
+  },
+  // GET /users/me/classes/:classId - Get user data in specific class
+  async getMyDataInClass(
+    classId: string | number,
+  ): Promise<ApiResponse<UserInClassData>> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[UserService] GET /users/me/classes/${id}`);
+    const response = await apiClient.get<ApiResponse<UserInClassData>>(
+      `/users/me/classes/${id}`,
+    );
+    console.log(`[UserService] Response:`, response.data);
     return response.data;
   },
 };
 
 export const classService = {
   async getAllClasses(): Promise<ApiResponse<any[]>> {
-    const response = await apiClient.get<ApiResponse<any[]>>('/classes/getAll');
+    const response = await apiClient.get<ApiResponse<any[]>>("/classes/getAll");
     return response.data;
   },
   async createClass(classData: any): Promise<ApiResponse<any>> {
-    const response = await apiClient.post<ApiResponse<any>>('/classes/create', classData);
+    const response = await apiClient.post<ApiResponse<any>>(
+      "/classes/create",
+      classData,
+    );
     return response.data;
   },
 };
@@ -132,7 +179,9 @@ export interface AnswerDailyQuizResponse {
 
 export const quizService = {
   // GET /quizzes/classes/:classId - GetAllQuizzesbyId
-  async getQuizzesFromClass(classId: string | number): Promise<QuizSmallResponse[]> {
+  async getQuizzesFromClass(
+    classId: string | number,
+  ): Promise<QuizSmallResponse[]> {
     const id = encodeURIComponent(String(classId));
     console.log(`[QuizService] GET /quizzes/classes/${id}`);
     const response = await apiClient.get<any>(`/quizzes/classes/${id}`);
@@ -150,7 +199,7 @@ export const quizService = {
     if (data?.data && Array.isArray(data.data)) {
       return data.data;
     }
-    console.warn('[QuizService] Formato de respuesta inesperado:', data);
+    console.warn("[QuizService] Formato de respuesta inesperado:", data);
     return [];
   },
 
@@ -176,7 +225,9 @@ export const quizService = {
   },
 
   // GET /quizzes/classes/:classId/answers - GetAllOwnAnswers
-  async getAllOwnAnswers(classId: string | number): Promise<QuizAnswerSmallResponse[]> {
+  async getAllOwnAnswers(
+    classId: string | number,
+  ): Promise<QuizAnswerSmallResponse[]> {
     const id = encodeURIComponent(String(classId));
     console.log(`[QuizService] GET /quizzes/classes/${id}/answers`);
     const response = await apiClient.get<any>(`/quizzes/classes/${id}/answers`);
@@ -194,7 +245,7 @@ export const quizService = {
     if (data?.data && Array.isArray(data.data)) {
       return data.data;
     }
-    console.warn('[QuizService] Formato de respuesta inesperado:', data);
+    console.warn("[QuizService] Formato de respuesta inesperado:", data);
     return [];
   },
 
@@ -209,17 +260,219 @@ export const quizService = {
   },
 
   // POST /quizzes/classes/:classId/daily/answer - AnswerDailyQuiz
-  async answerDailyQuiz(classId: string | number, answers: AnswerDailyQuizRequest): Promise<AnswerDailyQuizResponse> {
+  async answerDailyQuiz(
+    classId: string | number,
+    answers: AnswerDailyQuizRequest,
+  ): Promise<AnswerDailyQuizResponse> {
     const id = encodeURIComponent(String(classId));
-    console.log(`[QuizService] POST /quizzes/classes/${id}/daily/answer`, answers);
+    console.log(
+      `[QuizService] POST /quizzes/classes/${id}/daily/answer`,
+      answers,
+    );
     const response = await apiClient.post<any>(
       `/quizzes/classes/${id}/daily/answer`,
-      answers
+      answers,
     );
     console.log(`[QuizService] Response:`, response.data);
     const data = response.data;
     // Manejar respuesta directa o envuelta
     return data?.body || data?.data || data;
+  },
+};
+
+// Material Service
+export const materialService = {
+  // GET /material/classes/:classId - GetMaterialInfoFromClass
+  async getMaterialInfoFromClass(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[MaterialService] GET /material/classes/${id}`);
+    const response = await apiClient.get<any>(`/material/classes/${id}`);
+    console.log(`[MaterialService] Response:`, response.data);
+    return response.data;
+  },
+
+  // GET /material/:materialId - GetMaterial
+  async getMaterial(materialId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(materialId));
+    console.log(`[MaterialService] GET /material/${id}`);
+    const response = await apiClient.get<any>(`/material/${id}`);
+    console.log(`[MaterialService] Response:`, response.data);
+    return response.data;
+  },
+
+  // POST /material/classes/:classId - UploadMaterialToClass
+  async uploadMaterialToClass(
+    classId: string | number,
+    file: File,
+  ): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    const formData = new FormData();
+    formData.append("file", file);
+
+    console.log(`[MaterialService] POST /material/classes/${id}`);
+    console.log(`[MaterialService] File name:`, file.name);
+    console.log(`[MaterialService] File type:`, file.type);
+    console.log(`[MaterialService] File size:`, file.size);
+    console.log(
+      `[MaterialService] FormData keys:`,
+      Array.from(formData.keys()),
+    );
+
+    const response = await apiClient.post<any>(
+      `/material/classes/${id}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+    console.log(`[MaterialService] Response:`, response.data);
+    return response.data;
+  },
+};
+
+// Shop Service
+export interface PurchaseShopItemRequest {
+  itemId: number;
+}
+
+export const shopService = {
+  // GET /shop/ - GetShopItems
+  async getShopItems(): Promise<any> {
+    console.log(`[ShopService] GET /shop/`);
+    const response = await apiClient.get<any>("/shop/");
+    console.log(`[ShopService] Response:`, response.data);
+    return response.data;
+  },
+
+  // GET /shop/items/:itemId - GetShopItem
+  async getShopItem(itemId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(itemId));
+    console.log(`[ShopService] GET /shop/items/${id}`);
+    const response = await apiClient.get<any>(`/shop/items/${id}`);
+    console.log(`[ShopService] Response:`, response.data);
+    return response.data;
+  },
+
+  // POST /shop/classes/:classId/purchase - PurchaseShopItem
+  async purchaseShopItem(
+    classId: string | number,
+    itemId: number,
+  ): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    const requestBody: PurchaseShopItemRequest = { itemId };
+
+    console.log(`[ShopService] POST /shop/classes/${id}/purchase`, requestBody);
+    const response = await apiClient.post<any>(
+      `/shop/classes/${id}/purchase`,
+      requestBody,
+    );
+    console.log(`[ShopService] Response:`, response.data);
+    return response.data;
+  },
+};
+
+// Items Service
+export const itemsService = {
+  // GET /shop/classes/:classId/purchase - GetItem
+  async getItem(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[ItemsService] GET /shop/classes/${id}/purchase`);
+    const response = await apiClient.get<any>(`/shop/classes/${id}/purchase`);
+    console.log(`[ItemsService] Response:`, response.data);
+    return response.data;
+  },
+};
+
+// Inventory Service
+export const inventoryService = {
+  // GET /inventory/classes/:classId - GetOwnItemsInClass
+  async getOwnItemsInClass(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[InventoryService] GET /inventory/classes/${id}`);
+    const response = await apiClient.get<any>(`/inventory/classes/${id}`);
+    console.log(`[InventoryService] Response:`, response.data);
+    return response.data;
+  },
+};
+
+// Pets Service
+export interface CreatePetRequest {
+  name: string;
+  type: string; // e.g., "DOG"
+}
+
+export const petsService = {
+  // GET /pets/classes/:classId - GetAllPetsFromClass
+  async getAllPetsFromClass(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[PetsService] GET /pets/classes/${id}`);
+    const response = await apiClient.get<any>(`/pets/classes/${id}`);
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // GET /pets/:petId - GetPet
+  async getPet(petId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(petId));
+    console.log(`[PetsService] GET /pets/${id}`);
+    const response = await apiClient.get<any>(`/pets/${id}`);
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // GET /pets/classes/:classId/me - GetOwnPet
+  async getOwnPet(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[PetsService] GET /pets/classes/${id}/me`);
+    const response = await apiClient.get<any>(`/pets/classes/${id}/me`);
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // GET /pets/me - GetOwnPets
+  async getOwnPets(): Promise<any> {
+    console.log(`[PetsService] GET /pets/me`);
+    const response = await apiClient.get<any>("/pets/me");
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // POST /pets/classes/:classId - CreatePet
+  async createPet(
+    classId: string | number,
+    petData: CreatePetRequest,
+  ): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[PetsService] POST /pets/classes/${id}`, petData);
+    const response = await apiClient.post<any>(`/pets/classes/${id}`, petData);
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // PATCH /pets/:petId/equip - EquipItem
+  async equipItem(petId: string | number, itemData?: any): Promise<any> {
+    const id = encodeURIComponent(String(petId));
+    console.log(`[PetsService] PATCH /pets/${id}/equip`, itemData);
+    const response = await apiClient.patch<any>(
+      `/pets/${id}/equip`,
+      itemData || {},
+    );
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // PATCH /pets/:petId/feed - FeedPet
+  async feedPet(petId: string | number, feedData?: any): Promise<any> {
+    const id = encodeURIComponent(String(petId));
+    console.log(`[PetsService] PATCH /pets/${id}/feed`, feedData);
+    const response = await apiClient.patch<any>(
+      `/pets/${id}/feed`,
+      feedData || {},
+    );
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
   },
 };
 
