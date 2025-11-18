@@ -9,14 +9,6 @@ import {
 } from "./ui/card";
 import { Badge } from "./ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import {
   ShoppingCart,
   ArrowLeft,
   Sparkles,
@@ -24,6 +16,9 @@ import {
   Coins,
 } from "lucide-react";
 import { shopService } from "../services/api";
+import { toast } from "sonner";
+
+const API_BASE_URL = "http://localhost:3000";
 
 interface ShopItem {
   id: string | number;
@@ -49,6 +44,12 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+
+  // Debug: monitorear cambios en selectedItem
+  useEffect(() => {
+    console.log("[Shop] selectedItem cambió:", selectedItem);
+    console.log("[Shop] !!selectedItem (open prop):", !!selectedItem);
+  }, [selectedItem]);
 
   useEffect(() => {
     loadShopItems();
@@ -87,15 +88,31 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
   }
 
   async function handlePurchase() {
-    if (!selectedItem) return;
+    if (!selectedItem) {
+      console.warn("[Shop] handlePurchase: No hay item seleccionado");
+      return;
+    }
+
+    console.log("[Shop] Iniciando compra...");
+    console.log("[Shop] Item seleccionado:", selectedItem);
+    console.log("[Shop] Class ID:", classId);
+    console.log("[Shop] KumoSoles actuales:", kumoSoles);
+    console.log("[Shop] Precio del item:", selectedItem.price);
 
     setPurchasing(true);
     try {
+      console.log(
+        `[Shop] Llamando a shopService.purchaseShopItem(${classId}, ${Number(selectedItem.id)})`,
+      );
+
       const response = await shopService.purchaseShopItem(
         classId,
         Number(selectedItem.id),
       );
-      console.log("Compra exitosa:", response);
+
+      console.log("[Shop] ✅ Compra exitosa - Respuesta completa:", response);
+      console.log("[Shop] Tipo de respuesta:", typeof response);
+      console.log("[Shop] Keys de respuesta:", Object.keys(response || {}));
 
       // Calcular nuevo balance
       const newBalance =
@@ -103,22 +120,47 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
         response?.body?.newBalance ??
         kumoSoles - selectedItem.price;
 
+      console.log("[Shop] Nuevo balance calculado:", newBalance);
+      console.log("[Shop] response?.newBalance:", response?.newBalance);
+      console.log(
+        "[Shop] response?.body?.newBalance:",
+        response?.body?.newBalance,
+      );
+      console.log(
+        "[Shop] Fallback (kumoSoles - precio):",
+        kumoSoles - selectedItem.price,
+      );
+
       if (onPurchase) {
+        console.log("[Shop] Llamando a callback onPurchase con:", newBalance);
         onPurchase(newBalance);
+      } else {
+        console.warn("[Shop] No hay callback onPurchase disponible");
       }
 
-      alert(`¡Compraste ${selectedItem.name}!`);
+      toast.success(`¡Compraste ${selectedItem.name}!`);
       setSelectedItem(null);
 
       // Recargar items para actualizar stock si es necesario
+      console.log("[Shop] Recargando items de la tienda...");
       loadShopItems();
     } catch (err: any) {
-      console.error("Error en la compra:", err);
-      alert(
-        "Error al comprar el item: " +
-          (err.response?.data?.message || err.message || "Error desconocido"),
-      );
+      console.error("[Shop] ❌ Error en la compra:", err);
+      console.error("[Shop] Error completo:", {
+        message: err?.message,
+        response: err?.response,
+        responseData: err?.response?.data,
+        responseStatus: err?.response?.status,
+        responseHeaders: err?.response?.headers,
+      });
+
+      const message =
+        err?.response?.data?.message || err?.message || "Error desconocido";
+      console.error("[Shop] Mensaje de error extraído:", message);
+
+      toast.error("Error al comprar el item", { description: message });
     } finally {
+      console.log("[Shop] Finalizando compra, setPurchasing(false)");
       setPurchasing(false);
     }
   }
@@ -130,7 +172,7 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
     if (lower.includes("accessory") || lower.includes("accesorio")) return "🎩";
     if (lower.includes("food") || lower.includes("comida")) return "🍖";
     if (lower.includes("toy") || lower.includes("juguete")) return "🎾";
-    return "🎁";
+    return "��";
   };
 
   return (
@@ -200,7 +242,7 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
                       <div className="text-6xl mb-2">
                         {item.imageUrl ? (
                           <img
-                            src={item.imageUrl}
+                            src={`${API_BASE_URL}/${item.imageUrl}`}
                             alt={item.name}
                             className="w-20 h-20 mx-auto object-contain"
                             onError={(e) => {
@@ -261,9 +303,27 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
                     <Button
                       className="w-full mt-4"
                       disabled={!canAfford || outOfStock}
-                      onClick={() =>
-                        canAfford && !outOfStock && setSelectedItem(item)
-                      }
+                      onClick={() => {
+                        console.log(
+                          "[Shop] Click en botón Comprar del item:",
+                          item,
+                        );
+                        console.log("[Shop] canAfford:", canAfford);
+                        console.log("[Shop] outOfStock:", outOfStock);
+                        if (canAfford && !outOfStock) {
+                          console.log(
+                            "[Shop] Abriendo diálogo de confirmación...",
+                          );
+                          setSelectedItem(item);
+                        } else {
+                          console.warn(
+                            "[Shop] No se puede comprar - canAfford:",
+                            canAfford,
+                            "outOfStock:",
+                            outOfStock,
+                          );
+                        }
+                      }}
                     >
                       {outOfStock
                         ? "Sin stock"
@@ -289,26 +349,35 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
           </div>
         )}
 
-        {/* Diálogo de confirmación de compra */}
-        <Dialog
-          open={!!selectedItem}
-          onOpenChange={(open) => !open && setSelectedItem(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirmar compra</DialogTitle>
-              <DialogDescription>
-                ¿Estás seguro que quieres comprar este item?
-              </DialogDescription>
-            </DialogHeader>
+        {/* Diálogo de confirmación de compra - Modal personalizado */}
+        {selectedItem && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => {
+              console.log("[Shop] Click en overlay");
+              setSelectedItem(null);
+            }}
+          >
+            <div
+              className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4"
+              onClick={(e) => {
+                console.log("[Shop] Click en modal content");
+                e.stopPropagation();
+              }}
+            >
+              <div className="mb-4">
+                <h2 className="text-xl font-bold">Confirmar compra</h2>
+                <p className="text-sm text-gray-600">
+                  ¿Estás seguro que quieres comprar este item?
+                </p>
+              </div>
 
-            {selectedItem && (
               <div className="py-4">
                 <div className="text-center mb-4">
                   <div className="text-6xl mb-2">
                     {selectedItem.imageUrl ? (
                       <img
-                        src={selectedItem.imageUrl}
+                        src={`${API_BASE_URL}/${selectedItem.imageUrl}`}
                         alt={selectedItem.name}
                         className="w-20 h-20 mx-auto object-contain"
                       />
@@ -318,13 +387,13 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
                   </div>
                   <h3 className="font-bold text-xl">{selectedItem.name}</h3>
                   {selectedItem.description && (
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="text-sm text-gray-600 mt-1">
                       {selectedItem.description}
                     </p>
                   )}
                 </div>
 
-                <div className="space-y-2 bg-accent/20 p-4 rounded-lg">
+                <div className="space-y-2 bg-gray-100 p-4 rounded-lg">
                   <div className="flex justify-between">
                     <span>Precio:</span>
                     <span className="font-bold flex items-center gap-1">
@@ -339,7 +408,7 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
                       {kumoSoles}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t pt-2">
+                  <div className="flex justify-between border-t border-gray-300 pt-2">
                     <span>Saldo después:</span>
                     <span className="font-bold flex items-center gap-1">
                       <Sparkles className="h-4 w-4 text-yellow-500" />
@@ -348,22 +417,31 @@ export function Shop({ onBack, classId, kumoSoles, onPurchase }: ShopProps) {
                   </div>
                 </div>
               </div>
-            )}
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setSelectedItem(null)}
-                disabled={purchasing}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handlePurchase} disabled={purchasing}>
-                {purchasing ? "Comprando..." : "Confirmar compra"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    console.log("[Shop] Click en Cancelar");
+                    setSelectedItem(null);
+                  }}
+                  disabled={purchasing}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    console.log("[Shop] Click en Confirmar compra");
+                    handlePurchase();
+                  }}
+                  disabled={purchasing}
+                >
+                  {purchasing ? "Comprando..." : "Confirmar compra"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

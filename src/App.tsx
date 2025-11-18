@@ -8,6 +8,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Role } from "./types/auth";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { SystemShopManager } from "./components/SystemShopManager";
+import { Toaster } from "sonner";
 
 type AppState = "landing" | "login";
 
@@ -86,6 +87,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppContent />
+      <Toaster richColors position="top-right" />
     </AuthProvider>
   );
 }

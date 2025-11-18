@@ -29,6 +29,7 @@ import { ArrowLeft, Heart, Zap, TrendingUp, Apple, Plus } from "lucide-react";
 import { petsService } from "../services/api";
 import { Pet, CreatePetData } from "../types/pet";
 import { Progress } from "./ui/progress";
+import { PetAvatar } from "./PetAvatar";
 
 interface PetManagerProps {
   onBack: () => void;
@@ -36,11 +37,14 @@ interface PetManagerProps {
 }
 
 const PET_TYPES = [
-  { value: "DOG", label: "Perro", emoji: "🐕" },
   { value: "CAT", label: "Gato", emoji: "🐱" },
-  { value: "RABBIT", label: "Conejo", emoji: "🐰" },
+  { value: "DOG", label: "Perro", emoji: "🐕" },
   { value: "BIRD", label: "Pájaro", emoji: "🐦" },
+  { value: "TURTLE", label: "Tortuga", emoji: "🐢" },
+  { value: "RABBIT", label: "Conejo", emoji: "🐰" },
+  { value: "DUCK", label: "Pato", emoji: "🦆" },
   { value: "HAMSTER", label: "Hámster", emoji: "🐹" },
+  { value: "UNICORN", label: "Unicornio", emoji: "🦄" },
 ];
 
 export function PetManager({ onBack, classId }: PetManagerProps) {
@@ -227,17 +231,12 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                     </CardDescription>
                   </div>
                   <div className="text-center">
-                    <div className="text-6xl">
-                      {myPet.imageUrl ? (
-                        <img
-                          src={myPet.imageUrl}
-                          alt={myPet.name}
-                          className="w-20 h-20 object-contain"
-                        />
-                      ) : (
-                        getPetEmoji(myPet.type)
-                      )}
-                    </div>
+                    <PetAvatar
+                      petType={myPet.type}
+                      petImageUrl={myPet.imageUrl}
+                      equippedItems={myPet.equippedItems}
+                      size="lg"
+                    />
                     <Badge variant="secondary" className="mt-2">
                       <TrendingUp className="h-3 w-3 mr-1" />
                       Nivel {myPet.level || 1}

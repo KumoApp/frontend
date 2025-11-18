@@ -23,7 +23,6 @@ import {
 
 import { ChatBot } from "./ChatBot";
 import { QuizModal } from "./QuizModal";
-import { PetCustomization } from "./PetCustomization";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { QuizHistory } from "./QuizHistory";
 import { Shop } from "./Shop";
@@ -47,8 +46,6 @@ interface StudentData {
   streak: number;
   level: number;
   petName: string;
-  petColor: string;
-  petAccessories: string[];
 }
 
 interface StudentDashboardProps {
@@ -96,8 +93,6 @@ export function StudentDashboard({
     streak: 0,
     level: 1,
     petName: "",
-    petColor: "#8DBCC7",
-    petAccessories: [],
   });
 
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -325,17 +320,6 @@ export function StudentDashboard({
     }
   };
 
-  const handlePetCustomization = (
-    newColor: string,
-    newAccessories: string[],
-  ) => {
-    setStudentData((prev) => ({
-      ...prev,
-      petColor: newColor,
-      petAccessories: newAccessories,
-    }));
-  };
-
   // Vistas secundarias
   if (activeView === "chat") {
     if (!selectedClass) {
@@ -362,16 +346,6 @@ export function StudentDashboard({
         selectedClass={selectedClass}
         classes={classes}
         onClassChange={setSelectedClass}
-      />
-    );
-  }
-
-  if (activeView === "customize") {
-    return (
-      <PetCustomization
-        onBack={() => setActiveView("dashboard")}
-        studentData={studentData}
-        onCustomize={handlePetCustomization}
       />
     );
   }
@@ -618,10 +592,7 @@ export function StudentDashboard({
 
           <Card className="bg-white/90 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div
-                className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: studentData.petColor }}
-              >
+              <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center bg-primary">
                 <span className="text-white text-xl">🐱</span>
               </div>
               <p className="text-sm font-medium">{studentData.petName}</p>
@@ -673,16 +644,6 @@ export function StudentDashboard({
             <History className="h-8 w-8" />
             <span>Historial de Quizzes</span>
           </Button>
-
-          <Button
-            onClick={() => setActiveView("customize")}
-            variant="outline"
-            className="h-24 flex flex-col gap-2"
-          >
-            <Gift className="h-8 w-8" />
-            <span>Personalizar Mascota</span>
-          </Button>
-
           <Button
             onClick={() => setActiveView("shop")}
             variant="outline"

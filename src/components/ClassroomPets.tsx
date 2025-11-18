@@ -5,6 +5,15 @@ import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { ArrowLeft, Users, Trophy, Star, Loader2 } from "lucide-react";
 import { petsService, classService } from "../services/api";
+import { PetAvatar } from "./PetAvatar";
+
+interface EquippedItem {
+  id: number;
+  name: string;
+  imageUrl?: string;
+  category?: string;
+  type?: string;
+}
 
 interface Pet {
   id: number;
@@ -12,7 +21,10 @@ interface Pet {
   type: string;
   happiness: number;
   level: number;
-  student?: number; // ID del estudiante dueño
+  imageUrl?: string;
+  equippedItems?: EquippedItem[];
+  ownerId?: number; // ID del estudiante dueño
+  student?: number;
   owner?: {
     id: number;
     name: string;
@@ -25,11 +37,26 @@ interface ClassroomPetsProps {
   classId: string;
 }
 
+interface Student {
+  id: number;
+  email: string;
+  name: string;
+  lastname: string;
+  username: string;
+  level: number;
+  experience: number;
+  coins: number;
+  streak: number;
+}
+
 export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [className, setClassName] = useState<string>("");
+  const [studentsMap, setStudentsMap] = useState<Map<number, Student>>(
+    new Map(),
+  );
 
   useEffect(() => {
     loadClassroomData();
@@ -51,6 +78,16 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
         setClassName(classData.name);
       }
 
+      // Crear un mapa de estudiantes por ID
+      if (classData?.students && Array.isArray(classData.students)) {
+        const map = new Map<number, Student>();
+        classData.students.forEach((student: Student) => {
+          map.set(student.id, student);
+        });
+        setStudentsMap(map);
+        console.log("[ClassroomPets] Estudiantes mapeados:", map);
+      }
+
       // Obtener mascotas de la clase
       const response = await petsService.getAllPetsFromClass(classId);
       console.log("[ClassroomPets] Respuesta:", response);
@@ -61,19 +98,111 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
 
       console.log("[ClassroomPets] Lista de mascotas:", list);
 
-      // Log de cada mascota para ver la estructura del owner
-      list.forEach((pet: any, index: number) => {
-        console.log(`[ClassroomPets] Mascota ${index}:`, {
-          id: pet.id,
-          name: pet.name,
-          owner: pet.owner,
-          ownerId: pet.ownerId,
-          user: pet.user,
-          completo: pet,
-        });
+      // Procesar mascotas y extraer el ownerId del objeto student
+      const petsWithOwners = list.map((pet: any) => {
+        console.log(`[ClassroomPets] Procesando pet ${pet.id}:`, pet);
+
+        // El endpoint devuelve pet.student como objeto completo con { id, name, lastname, ... }
+        let ownerId = null;
+
+        if (pet.student && typeof pet.student === "object" && pet.student.id) {
+          ownerId = pet.student.id;
+          console.log(
+            `[ClassroomPets] ✅ Pet ${pet.id} (${pet.name}) - ownerId desde pet.student.id: ${ownerId}`,
+          );
+        } else if (typeof pet.student === "number") {
+          ownerId = pet.student;
+          console.log(
+            `[ClassroomPets] ✅ Pet ${pet.id} (${pet.name}) - ownerId desde pet.student: ${ownerId}`,
+          );
+        } else if (typeof pet.ownerId === "number") {
+          ownerId = pet.ownerId;
+          console.log(
+            `[ClassroomPets] ✅ Pet ${pet.id} (${pet.name}) - ownerId desde pet.ownerId: ${ownerId}`,
+          );
+        }
+
+        console.log(
+          `[ClassroomPets] Pet ${pet.id} (${pet.name}) -> ownerId final: ${ownerId}`,
+        );
+
+        return {
+          ...pet,
+          ownerId: ownerId,
+        };
       });
 
-      setPets(list);
+      /* OLD CODE - comentado
+      const petsWithOwners = list.map((pet: any) => {
+        console.log(`[ClassroomPets] ========== PROCESANDO MASCOTA ==========`);
+        console.log(
+          `[ClassroomPets] Objeto completo:`,
+          JSON.stringify(pet, null, 2),
+        );
+        console.log(
+          `[ClassroomPets] pet.ownerId:`,
+          pet.ownerId,
+          typeof pet.ownerId,
+        );
+        console.log(
+          `[ClassroomPets] pet.studentId:`,
+          pet.studentId,
+          typeof pet.studentId,
+        );
+        console.log(
+          `[ClassroomPets] pet.student:`,
+          pet.student,
+          typeof pet.student,
+        );
+        console.log(
+          `[ClassroomPets] pet.userId:`,
+          pet.userId,
+          typeof pet.userId,
+        );
+        console.log(`[ClassroomPets] pet.owner:`, pet.owner);
+        console.log(`[ClassroomPets] Todas las keys:`, Object.keys(pet));
+
+        // Obtener el ownerId de diferentes posibles ubicaciones
+        let ownerId = null;
+
+        // Intentar diferentes propiedades
+        if (typeof pet.ownerId === "number") {
+          ownerId = pet.ownerId;
+          console.log(`[ClassroomPets] ✅ Usando pet.ownerId:`, ownerId);
+        } else if (typeof pet.studentId === "number") {
+          ownerId = pet.studentId;
+          console.log(`[ClassroomPets] ✅ Usando pet.studentId:`, ownerId);
+        } else if (typeof pet.userId === "number") {
+          ownerId = pet.userId;
+          console.log(`[ClassroomPets] ✅ Usando pet.userId:`, ownerId);
+        } else if (typeof pet.student === "number") {
+          ownerId = pet.student;
+          console.log(`[ClassroomPets] ✅ Usando pet.student:`, ownerId);
+        } else if (pet.owner && typeof pet.owner.id === "number") {
+          ownerId = pet.owner.id;
+          console.log(`[ClassroomPets] ✅ Usando pet.owner.id:`, ownerId);
+        } else if (pet.owner && typeof pet.owner === "number") {
+          ownerId = pet.owner;
+          console.log(`[ClassroomPets] ✅ Usando pet.owner:`, ownerId);
+        }
+
+        console.log(`[ClassroomPets] ownerId FINAL detectado:`, ownerId);
+        console.log(
+          `[ClassroomPets] ==========================================`,
+        );
+
+        return {
+          ...pet,
+          ownerId: ownerId,
+        };
+      });
+      */
+
+      console.log(
+        "[ClassroomPets] Mascotas con owners procesadas:",
+        petsWithOwners,
+      );
+      setPets(petsWithOwners);
     } catch (e: any) {
       console.error("[ClassroomPets] Error cargando mascotas:", e);
       setError("No se pudieron cargar las mascotas del salón.");
@@ -84,18 +213,22 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
 
   const getPetIcon = (type: string) => {
     switch (type.toUpperCase()) {
-      case "DOG":
-        return "🐕";
       case "CAT":
         return "🐱";
-      case "RABBIT":
-        return "🐰";
+      case "DOG":
+        return "🐕";
       case "BIRD":
         return "🐦";
+      case "TURTLE":
+        return "🐢";
+      case "RABBIT":
+        return "🐰";
+      case "DUCK":
+        return "🦆";
       case "HAMSTER":
         return "🐹";
-      case "FISH":
-        return "🐟";
+      case "UNICORN":
+        return "🦄";
       default:
         return "🐾";
     }
@@ -103,18 +236,22 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
 
   const getPetTypeName = (type: string) => {
     switch (type.toUpperCase()) {
-      case "DOG":
-        return "Perro";
       case "CAT":
         return "Gato";
-      case "RABBIT":
-        return "Conejo";
+      case "DOG":
+        return "Perro";
       case "BIRD":
         return "Pájaro";
+      case "TURTLE":
+        return "Tortuga";
+      case "RABBIT":
+        return "Conejo";
+      case "DUCK":
+        return "Pato";
       case "HAMSTER":
         return "Hámster";
-      case "FISH":
-        return "Pez";
+      case "UNICORN":
+        return "Unicornio";
       default:
         return type;
     }
@@ -128,12 +265,38 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
   };
 
   const getOwnerName = (pet: Pet) => {
-    if (pet.owner) {
+    console.log(
+      "[ClassroomPets] getOwnerName para pet:",
+      pet.id,
+      "ownerId:",
+      pet.ownerId,
+    );
+
+    // Si tiene ownerId, buscar en el mapa de estudiantes
+    if (pet.ownerId && studentsMap.has(pet.ownerId)) {
+      const student = studentsMap.get(pet.ownerId)!;
+      const fullName = student.lastname
+        ? `${student.name} ${student.lastname}`
+        : student.name;
+      console.log("[ClassroomPets] Nombre encontrado:", fullName);
+      return fullName;
+    }
+
+    // Intentar con el objeto owner del pet
+    if (pet.owner && pet.owner.name) {
       const { name, lastname } = pet.owner;
       return lastname ? `${name} ${lastname}` : name;
     }
-    if (pet.student) {
-      return `Estudiante #${pet.student}`;
+
+    // Fallback
+    console.warn(
+      "[ClassroomPets] No se encontró nombre para pet:",
+      pet.id,
+      "ownerId:",
+      pet.ownerId,
+    );
+    if (pet.ownerId) {
+      return `Estudiante #${pet.ownerId}`;
     }
     return "Sin dueño";
   };
@@ -206,10 +369,13 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
                   <div className="grid grid-cols-3 gap-4">
                     {sortedPets.slice(0, 3).map((pet, index) => (
                       <div key={pet.id} className="text-center">
-                        <div className="relative mb-2">
-                          <div className="text-6xl mb-2">
-                            {getPetIcon(pet.type)}
-                          </div>
+                        <div className="relative mb-2 flex justify-center">
+                          <PetAvatar
+                            petType={pet.type}
+                            petImageUrl={pet.imageUrl}
+                            equippedItems={pet.equippedItems}
+                            size="lg"
+                          />
                           <div className="absolute -top-2 -right-2">
                             {index === 0 && (
                               <Trophy className="h-6 w-6 text-yellow-500" />
@@ -283,8 +449,13 @@ export function ClassroomPets({ onBack, classId }: ClassroomPetsProps) {
 
                     {/* Pet Display */}
                     <div className="text-center mb-3">
-                      <div className="text-6xl mb-2">
-                        {getPetIcon(pet.type)}
+                      <div className="mb-2 flex justify-center">
+                        <PetAvatar
+                          petType={pet.type}
+                          petImageUrl={pet.imageUrl}
+                          equippedItems={pet.equippedItems}
+                          size="lg"
+                        />
                       </div>
                       <h3 className="font-bold text-lg">{pet.name}</h3>
                       <p className="text-sm text-muted-foreground">

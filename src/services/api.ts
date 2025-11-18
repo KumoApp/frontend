@@ -380,13 +380,44 @@ export const shopService = {
     const id = encodeURIComponent(String(classId));
     const requestBody: PurchaseShopItemRequest = { itemId };
 
-    console.log(`[ShopService] POST /shop/classes/${id}/purchase`, requestBody);
-    const response = await apiClient.post<any>(
-      `/shop/classes/${id}/purchase`,
-      requestBody,
+    console.log(`[ShopService] ========== PURCHASE REQUEST ==========`);
+    console.log(`[ShopService] URL: POST /shop/classes/${id}/purchase`);
+    console.log(`[ShopService] classId (original):`, classId);
+    console.log(`[ShopService] classId (encoded):`, id);
+    console.log(`[ShopService] itemId:`, itemId);
+    console.log(`[ShopService] Request Body:`, requestBody);
+    console.log(
+      `[ShopService] Full URL:`,
+      `${API_BASE_URL}/shop/classes/${id}/purchase`,
     );
-    console.log(`[ShopService] Response:`, response.data);
-    return response.data;
+
+    try {
+      const response = await apiClient.post<any>(
+        `/shop/classes/${id}/purchase`,
+        requestBody,
+      );
+      console.log(`[ShopService] ========== PURCHASE RESPONSE ==========`);
+      console.log(`[ShopService] Status:`, response.status);
+      console.log(`[ShopService] Status Text:`, response.statusText);
+      console.log(`[ShopService] Headers:`, response.headers);
+      console.log(`[ShopService] Data:`, response.data);
+      console.log(`[ShopService] Data type:`, typeof response.data);
+      console.log(`[ShopService] Data keys:`, Object.keys(response.data || {}));
+      console.log(`[ShopService] ========================================`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[ShopService] ========== PURCHASE ERROR ==========`);
+      console.error(`[ShopService] Error:`, error);
+      console.error(`[ShopService] Error message:`, error?.message);
+      console.error(`[ShopService] Response status:`, error?.response?.status);
+      console.error(`[ShopService] Response data:`, error?.response?.data);
+      console.error(
+        `[ShopService] Response headers:`,
+        error?.response?.headers,
+      );
+      console.error(`[ShopService] ======================================`);
+      throw error;
+    }
   },
 
   // POST /shop/items - CreateShopItem (requires system authentication)

@@ -8,8 +8,11 @@ import {
   CardDescription,
 } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { ArrowLeft, Package, Check } from "lucide-react";
-import { inventoryService } from "../services/api";
+import { ArrowLeft, Package, Check, X, Utensils } from "lucide-react";
+import { inventoryService, petsService } from "../services/api";
+import { toast } from "sonner";
+
+const API_BASE_URL = "http://localhost:3000";
 
 interface InventoryItem {
   id: string | number;
@@ -17,6 +20,7 @@ interface InventoryItem {
   name: string;
   description?: string;
   type?: string;
+  category?: string;
   imageUrl?: string;
   quantity?: number;
   equipped?: boolean;
@@ -26,16 +30,37 @@ interface InventoryItem {
 interface InventoryProps {
   onBack: () => void;
   classId: string;
+  petId?: string | number;
 }
 
-export function Inventory({ onBack, classId }: InventoryProps) {
+export function Inventory({ onBack, classId, petId }: InventoryProps) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [myPetId, setMyPetId] = useState<string | number | null>(petId || null);
+  const [actionLoading, setActionLoading] = useState<string | number | null>(
+    null,
+  );
 
   useEffect(() => {
     loadInventory();
+    if (!petId) {
+      loadMyPet();
+    }
   }, [classId]);
+
+  async function loadMyPet() {
+    try {
+      const response = await petsService.getOwnPet(classId);
+      console.log("[Inventory] Mi mascota:", response);
+      const pet = response?.body || response?.data || response;
+      if (pet?.id) {
+        setMyPetId(pet.id);
+      }
+    } catch (e) {
+      console.error("[Inventory] Error cargando mascota:", e);
+    }
+  }
 
   async function loadInventory() {
     try {
@@ -55,6 +80,7 @@ export function Inventory({ onBack, classId }: InventoryProps) {
           name: item.name || "Item sin nombre",
           description: item.description,
           type: item.type,
+          category: item.category,
           imageUrl: item.imageUrl,
           quantity: item.quantity ?? 1,
           equipped: item.equipped ?? false,
@@ -69,14 +95,121 @@ export function Inventory({ onBack, classId }: InventoryProps) {
     }
   }
 
-  const getItemIcon = (type?: string) => {
-    if (!type) return "📦";
-    const lower = type.toLowerCase();
+  async function handleEquipItem(item: InventoryItem) {
+    if (!myPetId) {
+      toast.error("No se encontró tu mascota");
+      return;
+    }
+
+    console.log("[Inventory] Equipando item:", item);
+    setActionLoading(item.id);
+
+    try {
+      const response = await petsService.equipItem(myPetId, {
+        itemId: Number(item.itemId || item.id),
+      });
+      console.log("[Inventory] ✅ Item equipado:", response);
+      toast.success(`¡${item.name} equipado!`);
+
+      // Recargar inventario
+      await loadInventory();
+    } catch (err: any) {
+      console.error("[Inventory] ❌ Error equipando item:", err);
+      const message =
+        err?.response?.data?.message || err?.message || "Error al equipar item";
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleUnequipItem(item: InventoryItem) {
+    if (!myPetId) {
+      toast.error("No se encontró tu mascota");
+      return;
+    }
+
+    console.log("[Inventory] Desequipando item:", item);
+    setActionLoading(item.id);
+
+    try {
+      // Llamar al endpoint con itemId null o 0 para desequipar
+      const response = await petsService.equipItem(myPetId, {
+        itemId: 0,
+      });
+      console.log("[Inventory] ✅ Item desequipado:", response);
+      toast.success(`${item.name} desequipado`);
+
+      // Recargar inventario
+      await loadInventory();
+    } catch (err: any) {
+      console.error("[Inventory] ❌ Error desequipando item:", err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Error al desequipar item";
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleFeedPet(item: InventoryItem) {
+    if (!myPetId) {
+      toast.error("No se encontró tu mascota");
+      return;
+    }
+
+    console.log("[Inventory] Alimentando mascota con:", item);
+    setActionLoading(item.id);
+
+    try {
+      const response = await petsService.feedPet(myPetId, {
+        itemId: Number(item.itemId || item.id),
+      });
+      console.log("[Inventory] ✅ Mascota alimentada:", response);
+      toast.success(`¡Tu mascota disfrutó ${item.name}!`);
+
+      // Recargar inventario
+      await loadInventory();
+    } catch (err: any) {
+      console.error("[Inventory] ❌ Error alimentando mascota:", err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Error al alimentar mascota";
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const getItemIcon = (type?: string, category?: string) => {
+    const cat = category || type || "";
+    if (!cat) return "📦";
+    const lower = cat.toLowerCase();
     if (lower.includes("cloth") || lower.includes("ropa")) return "👕";
     if (lower.includes("accessory") || lower.includes("accesorio")) return "🎩";
     if (lower.includes("food") || lower.includes("comida")) return "🍖";
     if (lower.includes("toy") || lower.includes("juguete")) return "🎾";
     return "📦";
+  };
+
+  const isFood = (item: InventoryItem) => {
+    const cat = (item.category || item.type || "").toLowerCase();
+    return cat.includes("food") || cat.includes("comida");
+  };
+
+  const isAccessory = (item: InventoryItem) => {
+    const cat = (item.category || item.type || "").toLowerCase();
+    return (
+      cat.includes("accessory") ||
+      cat.includes("accesorio") ||
+      cat.includes("cloth") ||
+      cat.includes("ropa") ||
+      cat.includes("toy") ||
+      cat.includes("juguete")
+    );
   };
 
   const equippedItems = items.filter((item) => item.equipped);
@@ -138,15 +271,27 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                           <div className="text-4xl">
                             {item.imageUrl ? (
                               <img
-                                src={item.imageUrl}
+                                src={
+                                  item.imageUrl.startsWith("http")
+                                    ? item.imageUrl
+                                    : `${API_BASE_URL}/${item.imageUrl}`
+                                }
                                 alt={item.name}
                                 className="w-16 h-16 object-contain"
                                 onError={(e) => {
-                                  e.currentTarget.style.display = "none";
+                                  const target = e.currentTarget;
+                                  target.style.display = "none";
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = getItemIcon(
+                                      item.type,
+                                      item.category,
+                                    );
+                                  }
                                 }}
                               />
                             ) : (
-                              getItemIcon(item.type)
+                              getItemIcon(item.type, item.category)
                             )}
                           </div>
                           <div className="flex-1">
@@ -157,9 +302,9 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                               </p>
                             )}
                             <div className="mt-2 space-y-1">
-                              {item.type && (
+                              {(item.type || item.category) && (
                                 <Badge variant="outline" className="text-xs">
-                                  {item.type}
+                                  {item.category || item.type}
                                 </Badge>
                               )}
                               {item.quantity && item.quantity > 1 && (
@@ -178,6 +323,18 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                                 Equipado
                               </Badge>
                             </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full mt-2"
+                              onClick={() => handleUnequipItem(item)}
+                              disabled={actionLoading === item.id}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              {actionLoading === item.id
+                                ? "Desequipando..."
+                                : "Desequipar"}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -202,15 +359,27 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                           <div className="text-4xl">
                             {item.imageUrl ? (
                               <img
-                                src={item.imageUrl}
+                                src={
+                                  item.imageUrl.startsWith("http")
+                                    ? item.imageUrl
+                                    : `${API_BASE_URL}/${item.imageUrl}`
+                                }
                                 alt={item.name}
                                 className="w-16 h-16 object-contain"
                                 onError={(e) => {
-                                  e.currentTarget.style.display = "none";
+                                  const target = e.currentTarget;
+                                  target.style.display = "none";
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = getItemIcon(
+                                      item.type,
+                                      item.category,
+                                    );
+                                  }
                                 }}
                               />
                             ) : (
-                              getItemIcon(item.type)
+                              getItemIcon(item.type, item.category)
                             )}
                           </div>
                           <div className="flex-1">
@@ -221,9 +390,9 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                               </p>
                             )}
                             <div className="mt-2 space-y-1">
-                              {item.type && (
+                              {(item.type || item.category) && (
                                 <Badge variant="outline" className="text-xs">
-                                  {item.type}
+                                  {item.category || item.type}
                                 </Badge>
                               )}
                               {item.quantity && item.quantity > 1 && (
@@ -241,6 +410,41 @@ export function Inventory({ onBack, classId }: InventoryProps) {
                                     item.acquiredDate,
                                   ).toLocaleDateString()}
                                 </p>
+                              )}
+                            </div>
+                            {/* Botones de acción */}
+                            <div className="flex gap-2 mt-3">
+                              {isAccessory(item) && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="flex-1"
+                                  onClick={() => handleEquipItem(item)}
+                                  disabled={
+                                    actionLoading === item.id || !myPetId
+                                  }
+                                >
+                                  <Check className="h-3 w-3 mr-1" />
+                                  {actionLoading === item.id
+                                    ? "Equipando..."
+                                    : "Equipar"}
+                                </Button>
+                              )}
+                              {isFood(item) && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="flex-1"
+                                  onClick={() => handleFeedPet(item)}
+                                  disabled={
+                                    actionLoading === item.id || !myPetId
+                                  }
+                                >
+                                  <Utensils className="h-3 w-3 mr-1" />
+                                  {actionLoading === item.id
+                                    ? "Alimentando..."
+                                    : "Alimentar"}
+                                </Button>
                               )}
                             </div>
                           </div>
