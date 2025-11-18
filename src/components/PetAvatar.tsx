@@ -27,11 +27,14 @@ export function PetAvatar({
 }: PetAvatarProps) {
   const getPetEmoji = (type: string) => {
     const petTypes: { [key: string]: string } = {
-      DOG: "🐕",
       CAT: "🐱",
-      RABBIT: "🐰",
+      DOG: "🐕",
       BIRD: "🐦",
+      TURTLE: "🐢",
+      RABBIT: "🐰",
+      DUCK: "🦆",
       HAMSTER: "🐹",
+      UNICORN: "🦄",
     };
     return petTypes[type] || "🐾";
   };
@@ -54,13 +57,22 @@ export function PetAvatar({
     const cat = (category || type || "").toLowerCase();
 
     // Posiciones para diferentes tipos de accesorios
-    if (cat.includes("hat") || cat.includes("sombrero") || cat.includes("crown") || cat.includes("corona")) {
+    if (
+      cat.includes("hat") ||
+      cat.includes("sombrero") ||
+      cat.includes("crown") ||
+      cat.includes("corona")
+    ) {
       return { top: "-10%", left: "50%", transform: "translateX(-50%)" };
     }
     if (cat.includes("glasses") || cat.includes("gafas")) {
       return { top: "30%", left: "50%", transform: "translateX(-50%)" };
     }
-    if (cat.includes("scarf") || cat.includes("bufanda") || cat.includes("collar")) {
+    if (
+      cat.includes("scarf") ||
+      cat.includes("bufanda") ||
+      cat.includes("collar")
+    ) {
       return { bottom: "30%", left: "50%", transform: "translateX(-50%)" };
     }
     if (cat.includes("bow") || cat.includes("tie") || cat.includes("corbata")) {
@@ -83,7 +95,11 @@ export function PetAvatar({
       <div className={`flex items-center justify-center ${sizeClasses[size]}`}>
         {petImageUrl ? (
           <img
-            src={petImageUrl.startsWith("http") ? petImageUrl : `${API_BASE_URL}/${petImageUrl}`}
+            src={
+              petImageUrl.startsWith("http")
+                ? petImageUrl
+                : `${API_BASE_URL}/${petImageUrl}`
+            }
             alt="Pet"
             className="w-full h-full object-contain"
             onError={(e) => {
@@ -113,7 +129,11 @@ export function PetAvatar({
           >
             {item.imageUrl ? (
               <img
-                src={item.imageUrl.startsWith("http") ? item.imageUrl : `${API_BASE_URL}/${item.imageUrl}`}
+                src={
+                  item.imageUrl.startsWith("http")
+                    ? item.imageUrl
+                    : `${API_BASE_URL}/${item.imageUrl}`
+                }
                 alt={item.name}
                 className="w-full h-full object-contain drop-shadow-lg"
                 style={{
