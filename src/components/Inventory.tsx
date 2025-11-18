@@ -164,9 +164,10 @@ export function Inventory({ onBack, classId, petId }: InventoryProps) {
     setActionLoading(item.id);
 
     try {
-      const response = await petsService.feedPet(myPetId, {
-        itemId: Number(item.itemId || item.id),
-      });
+      const response = await petsService.feedPet(
+        myPetId,
+        Number(item.itemId || item.id),
+      );
       console.log("[Inventory] ✅ Mascota alimentada:", response);
       toast.success(`¡Tu mascota disfrutó ${item.name}!`);
 

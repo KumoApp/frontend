@@ -53,7 +53,6 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [feeding, setFeeding] = useState(false);
 
   // Form para crear mascota
   const [newPetName, setNewPetName] = useState("");
@@ -153,28 +152,6 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
     } finally {
       console.log("[PetManager] setCreating(false)");
       setCreating(false);
-    }
-  }
-
-  async function handleFeedPet() {
-    if (!myPet) return;
-
-    setFeeding(true);
-    try {
-      const response = await petsService.feedPet(myPet.id);
-      console.log("Mascota alimentada:", response);
-
-      // Recargar mascota para ver los cambios
-      await loadMyPet();
-
-      alert("¡Has alimentado a tu mascota!");
-    } catch (err: any) {
-      console.error("Error alimentando mascota:", err);
-      alert(
-        "Error al alimentar mascota: " + (err.message || "Error desconocido"),
-      );
-    } finally {
-      setFeeding(false);
     }
   }
 
@@ -311,16 +288,12 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                     </div>
                   )}
 
-                  {/* Acciones */}
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      onClick={handleFeedPet}
-                      disabled={feeding}
-                      className="flex-1"
-                    >
-                      <Apple className="h-4 w-4 mr-2" />
-                      {feeding ? "Alimentando..." : "Alimentar"}
-                    </Button>
+                  {/* Información */}
+                  <div className="pt-4">
+                    <p className="text-sm text-muted-foreground text-center">
+                      💡 Visita tu inventario para alimentar a tu mascota con
+                      items de comida
+                    </p>
                   </div>
                 </div>
               </CardContent>

@@ -4,6 +4,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { ProfileDropdown } from "./ProfileDropdown";
 import {
   Package,
@@ -20,6 +27,8 @@ import { shopService, CreateShopItemRequest } from "../services/api";
 interface SystemShopManagerProps {
   onLogout: () => void;
 }
+
+const ITEM_TYPES = ["BACKGROUND", "ACCESSORY", "FOOD"] as const;
 
 export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
   const { user, token } = useAuth();
@@ -100,6 +109,11 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
 
     if (formData.price <= 0) {
       setMessage({ type: "error", text: "El precio debe ser mayor a 0" });
+      return;
+    }
+
+    if (!formData.type) {
+      setMessage({ type: "error", text: "El tipo es obligatorio" });
       return;
     }
 
@@ -315,18 +329,30 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="type" className="text-base font-semibold">
-                    Tipo
+                    Tipo <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="type"
-                    name="type"
-                    type="text"
+                  <Select
                     value={formData.type}
-                    onChange={handleInputChange}
-                    placeholder="Ej: Accesorio, Comida"
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, type: value }))
+                    }
                     disabled={isLoading}
-                    className="text-base"
-                  />
+                  >
+                    <SelectTrigger id="type" className="text-base">
+                      <SelectValue placeholder="Selecciona un tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ITEM_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type === "BACKGROUND"
+                            ? "Fondo"
+                            : type === "ACCESSORY"
+                              ? "Accesorio"
+                              : "Comida"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

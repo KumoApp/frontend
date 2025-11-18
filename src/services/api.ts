@@ -556,12 +556,13 @@ export const petsService = {
   },
 
   // PATCH /pets/:petId/feed - FeedPet
-  async feedPet(petId: string | number, feedData?: any): Promise<any> {
+  async feedPet(petId: string | number, itemId: number): Promise<any> {
     const id = encodeURIComponent(String(petId));
-    console.log(`[PetsService] PATCH /pets/${id}/feed`, feedData);
+    const requestBody = { itemId };
+    console.log(`[PetsService] PATCH /pets/${id}/feed`, requestBody);
     const response = await apiClient.patch<any>(
       `/pets/${id}/feed`,
-      feedData || {},
+      requestBody,
     );
     console.log(`[PetsService] Response:`, response.data);
     return response.data;
