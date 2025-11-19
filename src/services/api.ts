@@ -11,9 +11,7 @@ const API_BASE_URL = "http://localhost:3000";
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // No establecer Content-Type por defecto para permitir FormData
 });
 
 apiClient.interceptors.request.use(
@@ -25,20 +23,42 @@ apiClient.interceptors.request.use(
     );
     console.log("[API Interceptor] Request URL:", config.url);
     console.log("[API Interceptor] Request method:", config.method);
+    console.log(
+      "[API Interceptor] Request data type:",
+      config.data?.constructor?.name,
+    );
+
+    // Configurar headers
+    config.headers = config.headers ?? {};
+
+    // Agregar token si existe
     if (token) {
-      config.headers = config.headers ?? {};
       (config.headers as any).Authorization = `Bearer ${token}`;
       console.log(
         "[API Interceptor] Authorization header set to:",
         `Bearer ${token.substring(0, 20)}...`,
       );
-      console.log(
-        "[API Interceptor] Headers after setting:",
-        JSON.stringify(config.headers),
-      );
     } else {
       console.warn("[API Interceptor] No token found in localStorage!");
     }
+
+    // Solo agregar Content-Type: application/json si NO es FormData
+    if (config.data && !(config.data instanceof FormData)) {
+      (config.headers as any)["Content-Type"] = "application/json";
+      console.log("[API Interceptor] Content-Type set to: application/json");
+    } else if (config.data instanceof FormData) {
+      // Eliminar Content-Type para que el navegador lo configure con el boundary
+      delete (config.headers as any)["Content-Type"];
+      console.log(
+        "[API Interceptor] FormData detected - Content-Type will be set by browser",
+      );
+    }
+
+    console.log(
+      "[API Interceptor] Final headers:",
+      JSON.stringify(config.headers),
+    );
+
     return config;
   },
   (error) => Promise.reject(error),
@@ -411,7 +431,7 @@ export interface CreateShopItemRequest {
   name: string;
   description?: string;
   price: number;
-  type: string; // Obligatorio: "FOOD", "BACKGROUND", "ACCESORY"
+  type: string; // Obligatorio: "FOOD", "BACKGROUND", "ACCESSORY"
 }
 
 export const shopService = {
@@ -486,7 +506,12 @@ export const shopService = {
     imageFile: File,
     systemToken: string,
   ): Promise<any> {
-    console.log(`[ShopService] POST /shop/items`, itemData);
+    console.log(`[ShopService] ========== CREATE SHOP ITEM ==========`);
+    console.log(`[ShopService] POST /shop/items`);
+    console.log(`[ShopService] itemData:`, itemData);
+    console.log(`[ShopService] imageFile:`, imageFile);
+    console.log(`[ShopService] imageFile type:`, imageFile?.type);
+    console.log(`[ShopService] imageFile size:`, imageFile?.size);
 
     // Crear FormData para enviar imagen + datos
     const formData = new FormData();
@@ -500,11 +525,24 @@ export const shopService = {
       formData.append("description", itemData.description);
     }
 
-    console.log(`[ShopService] Sending FormData with image:`, imageFile.name);
+    console.log(
+      `[ShopService] FormData created, type:`,
+      formData.constructor.name,
+    );
+    console.log(
+      `[ShopService] FormData instanceof FormData:`,
+      formData instanceof FormData,
+    );
     console.log(`[ShopService] FormData entries:`);
     for (let pair of formData.entries()) {
       console.log(`  ${pair[0]}:`, pair[1]);
     }
+    console.log(`[ShopService] About to send request...`);
+
+    console.log(
+      `[ShopService] systemToken (first 30 chars):`,
+      systemToken?.substring(0, 30),
+    );
 
     // No especificar Content-Type para que el navegador lo configure automáticamente
     // con el boundary correcto para multipart/form-data
@@ -513,7 +551,10 @@ export const shopService = {
         Authorization: `Bearer ${systemToken}`,
       },
     });
-    console.log(`[ShopService] Response:`, response.data);
+    console.log(`[ShopService] ========== RESPONSE RECEIVED ==========`);
+    console.log(`[ShopService] Status:`, response.status);
+    console.log(`[ShopService] Response data:`, response.data);
+    console.log(`[ShopService] ======================================`);
     return response.data;
   },
 };
