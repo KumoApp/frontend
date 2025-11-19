@@ -160,9 +160,13 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
     return petType?.emoji || "🐾";
   };
 
-  const getStatColor = (value: number) => {
-    if (value >= 70) return "bg-green-500";
-    if (value >= 40) return "bg-yellow-500";
+  const getStatColor = (value: number, isHunger: boolean = false) => {
+    // Para hambre: 0% = verde (sin hambre), 100% = rojo (mucha hambre)
+    // Para otras stats: 0% = rojo (mal), 100% = verde (bien)
+    const effectiveValue = isHunger ? 100 - value : value;
+
+    if (effectiveValue >= 70) return "bg-green-500";
+    if (effectiveValue >= 40) return "bg-yellow-500";
     return "bg-red-500";
   };
 
@@ -251,7 +255,7 @@ export function PetManager({ onBack, classId }: PetManagerProps) {
                       </div>
                       <Progress
                         value={myPet.hunger}
-                        className={`h-2 ${getStatColor(myPet.hunger)}`}
+                        className={`h-2 ${getStatColor(myPet.hunger, true)}`}
                       />
                     </div>
                   )}

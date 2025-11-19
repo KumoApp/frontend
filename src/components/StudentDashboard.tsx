@@ -701,33 +701,6 @@ export function StudentDashboard({
           </Button>
         </div>
 
-        {/* Progreso + Actividad */}
-        <Card className="bg-white/90 backdrop-blur mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-orange-500" />
-              Tu Progreso Esta Semana
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Quizzes completados</span>
-                  <span>5/7</span>
-                </div>
-                <Progress value={71} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Progreso hacia el siguiente nivel</span>
-                  <span>650/800 XP</span>
-                </div>
-                <Progress value={81} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Modal del Quiz Diario (pasa classId desde el selector superior) */}
         {activeView === "quiz" && selectedClass && (
