@@ -411,9 +411,7 @@ export interface CreateShopItemRequest {
   name: string;
   description?: string;
   price: number;
-  type?: string;
-  category?: string;
-  stock?: number;
+  type: string; // Obligatorio: "FOOD", "BACKGROUND", "ACCESORY"
 }
 
 export const shopService = {
@@ -495,19 +493,11 @@ export const shopService = {
     formData.append("image", imageFile);
     formData.append("name", itemData.name);
     formData.append("price", itemData.price.toString());
+    formData.append("type", itemData.type); // type es obligatorio
 
     // Campos opcionales
     if (itemData.description) {
       formData.append("description", itemData.description);
-    }
-    if (itemData.type) {
-      formData.append("type", itemData.type);
-    }
-    if (itemData.category) {
-      formData.append("category", itemData.category);
-    }
-    if (itemData.stock !== undefined && itemData.stock !== null) {
-      formData.append("stock", itemData.stock.toString());
     }
 
     console.log(`[ShopService] Sending FormData with image:`, imageFile.name);
@@ -516,10 +506,11 @@ export const shopService = {
       console.log(`  ${pair[0]}:`, pair[1]);
     }
 
+    // No especificar Content-Type para que el navegador lo configure automáticamente
+    // con el boundary correcto para multipart/form-data
     const response = await apiClient.post<any>("/shop/items", formData, {
       headers: {
         Authorization: `Bearer ${systemToken}`,
-        // No especificar Content-Type manualmente, axios lo hará automáticamente con boundary correcto
       },
     });
     console.log(`[ShopService] Response:`, response.data);

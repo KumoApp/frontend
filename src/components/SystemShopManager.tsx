@@ -44,8 +44,6 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
     description: "",
     price: 0,
     type: "",
-    category: "",
-    stock: 0,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -145,8 +143,6 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
         description: "",
         price: 0,
         type: "",
-        category: "",
-        stock: 0,
       });
       handleRemoveImage();
     } catch (error: any) {
@@ -177,8 +173,6 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
       description: "",
       price: 0,
       type: "",
-      category: "",
-      stock: 0,
     });
     handleRemoveImage();
     setMessage({ type: null, text: "" });
@@ -287,89 +281,60 @@ export function SystemShopManager({ onLogout }: SystemShopManagerProps) {
                 />
               </div>
 
-              {/* Price and Stock */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price" className="text-base font-semibold">
-                    Precio (Kumosoles) <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    min="1"
-                    value={formData.price || ""}
-                    onChange={handleInputChange}
-                    placeholder="100"
-                    required
-                    disabled={isLoading}
-                    className="text-base"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="stock" className="text-base font-semibold">
-                    Stock Disponible
-                  </Label>
-                  <Input
-                    id="stock"
-                    name="stock"
-                    type="number"
-                    min="0"
-                    value={formData.stock || ""}
-                    onChange={handleInputChange}
-                    placeholder="0 = ilimitado"
-                    disabled={isLoading}
-                    className="text-base"
-                  />
-                </div>
+              {/* Price */}
+              <div className="space-y-2">
+                <Label htmlFor="price" className="text-base font-semibold">
+                  Precio (Kumosoles) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  min="1"
+                  value={formData.price || ""}
+                  onChange={handleInputChange}
+                  placeholder="100"
+                  required
+                  disabled={isLoading}
+                  className="text-base"
+                />
               </div>
 
-              {/* Type and Category */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type" className="text-base font-semibold">
-                    Tipo <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, type: value }))
-                    }
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="type" className="text-base">
-                      <SelectValue placeholder="Selecciona un tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ITEM_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type === "BACKGROUND"
-                            ? "Fondo"
-                            : type === "ACCESSORY"
-                              ? "Accesorio"
-                              : "Comida"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="text-base font-semibold">
-                    Categoría
-                  </Label>
-                  <Input
-                    id="category"
-                    name="category"
-                    type="text"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    placeholder="Ej: Ropa, Consumible"
-                    disabled={isLoading}
-                    className="text-base"
-                  />
-                </div>
+              {/* Type */}
+              <div className="space-y-2">
+                <Label htmlFor="type" className="text-base font-semibold">
+                  Tipo <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, type: value }))
+                  }
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="type" className="text-base">
+                    <SelectValue placeholder="Selecciona un tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEM_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type === "BACKGROUND"
+                          ? "Fondo"
+                          : type === "ACCESSORY"
+                            ? "Accesorio"
+                            : "Comida"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.type === "BACKGROUND" &&
+                    "Items de fondo para personalizar"}
+                  {formData.type === "ACCESSORY" &&
+                    "Accesorios para decorar a la mascota"}
+                  {formData.type === "FOOD" &&
+                    "Comida para alimentar a la mascota"}
+                </p>
               </div>
 
               {/* Image Upload */}
