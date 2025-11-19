@@ -108,7 +108,7 @@ export function StudentDashboard({
     [token],
   );
 
-  // Cargar SOLO las clases donde está el estudiante -> GET /classes/
+  // Cargar SOLO las clases donde está el estudiante -> GET /classes/me
   useEffect(() => {
     let cancelled = false;
     async function loadMyClasses() {
@@ -116,7 +116,7 @@ export function StudentDashboard({
         setClassesLoading(true);
         setClassesError(null);
 
-        const resp = await fetch(`${BASE}/classes/`, { headers });
+        const resp = await fetch(`${BASE}/classes/me`, { headers });
 
         if (!resp.ok) {
           let detail = "";
@@ -158,7 +158,7 @@ export function StudentDashboard({
         }
       } catch (e: any) {
         if (!cancelled) {
-          console.error("Error cargando /classes/:", e);
+          console.error("Error cargando /classes/me:", e);
           setClassesError(
             "No se pudieron cargar tus clases. Revisa el token de estudiante o los permisos.",
           );

@@ -19,9 +19,25 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("auth_token");
+    console.log(
+      "[API Interceptor] Token from localStorage:",
+      token ? `${token.substring(0, 20)}...` : "NO TOKEN",
+    );
+    console.log("[API Interceptor] Request URL:", config.url);
+    console.log("[API Interceptor] Request method:", config.method);
     if (token) {
       config.headers = config.headers ?? {};
       (config.headers as any).Authorization = `Bearer ${token}`;
+      console.log(
+        "[API Interceptor] Authorization header set to:",
+        `Bearer ${token.substring(0, 20)}...`,
+      );
+      console.log(
+        "[API Interceptor] Headers after setting:",
+        JSON.stringify(config.headers),
+      );
+    } else {
+      console.warn("[API Interceptor] No token found in localStorage!");
     }
     return config;
   },
@@ -75,16 +91,20 @@ export const userService = {
     const response = await apiClient.get<ApiResponse<any[]>>("/users/getAll");
     return response.data;
   },
+  async getAllStudents(): Promise<ApiResponse<any[]>> {
+    const response = await apiClient.get<ApiResponse<any[]>>("/users/students");
+    return response.data;
+  },
   async createTeacher(userData: any): Promise<ApiResponse<any>> {
     const response = await apiClient.post<ApiResponse<any>>(
-      "/users/create/teacher",
+      "/users/teachers",
       userData,
     );
     return response.data;
   },
   async createStudent(userData: any): Promise<ApiResponse<any>> {
     const response = await apiClient.post<ApiResponse<any>>(
-      "/users/create/student",
+      "/users/students",
       userData,
     );
     return response.data;
@@ -111,13 +131,17 @@ export const userService = {
 };
 
 export const classService = {
+  async getMyClasses(): Promise<ApiResponse<any[]>> {
+    const response = await apiClient.get<ApiResponse<any[]>>("/classes/me");
+    return response.data;
+  },
   async getAllClasses(): Promise<ApiResponse<any[]>> {
-    const response = await apiClient.get<ApiResponse<any[]>>("/classes/getAll");
+    const response = await apiClient.get<ApiResponse<any[]>>("/classes/");
     return response.data;
   },
   async createClass(classData: any): Promise<ApiResponse<any>> {
     const response = await apiClient.post<ApiResponse<any>>(
-      "/classes/create",
+      "/classes/",
       classData,
     );
     return response.data;
@@ -129,6 +153,44 @@ export const classService = {
     const response = await apiClient.get<any>(`/classes/${id}`);
     console.log(`[ClassService] Response:`, response.data);
     return response.data;
+  },
+  // POST /classes/:classId/students - Add student to class
+  async addStudentToClass(
+    classId: string | number,
+    studentId: number,
+  ): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    const requestBody = { studentId, classId: Number(classId) };
+    console.log(`[ClassService] ========== ADD STUDENT TO CLASS ==========`);
+    console.log(`[ClassService] POST /classes/${id}/students`);
+    console.log(`[ClassService] classId (original):`, classId);
+    console.log(`[ClassService] classId (encoded):`, id);
+    console.log(`[ClassService] studentId:`, studentId);
+    console.log(`[ClassService] Request Body:`, requestBody);
+    console.log(
+      `[ClassService] Full URL:`,
+      `${API_BASE_URL}/classes/${id}/students`,
+    );
+
+    try {
+      const response = await apiClient.post<any>(
+        `/classes/${id}/students`,
+        requestBody,
+      );
+      console.log(`[ClassService] ========== SUCCESS ==========`);
+      console.log(`[ClassService] Status:`, response.status);
+      console.log(`[ClassService] Response:`, response.data);
+      console.log(`[ClassService] ================================`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[ClassService] ========== ERROR ==========`);
+      console.error(`[ClassService] Error:`, error);
+      console.error(`[ClassService] Error message:`, error?.message);
+      console.error(`[ClassService] Response status:`, error?.response?.status);
+      console.error(`[ClassService] Response data:`, error?.response?.data);
+      console.error(`[ClassService] ==============================`);
+      throw error;
+    }
   },
 };
 
@@ -562,6 +624,19 @@ export const petsService = {
     console.log(`[PetsService] PATCH /pets/${id}/feed`, requestBody);
     const response = await apiClient.patch<any>(
       `/pets/${id}/feed`,
+      requestBody,
+    );
+    console.log(`[PetsService] Response:`, response.data);
+    return response.data;
+  },
+
+  // PATCH /pets/:petId/unequip - UnequipItem
+  async unequipItem(petId: string | number, slotType: string): Promise<any> {
+    const id = encodeURIComponent(String(petId));
+    const requestBody = { slotType };
+    console.log(`[PetsService] PATCH /pets/${id}/unequip`, requestBody);
+    const response = await apiClient.patch<any>(
+      `/pets/${id}/unequip`,
       requestBody,
     );
     console.log(`[PetsService] Response:`, response.data);

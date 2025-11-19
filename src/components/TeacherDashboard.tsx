@@ -40,10 +40,13 @@ import {
   Download,
   Star,
   AlertTriangle,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { materialService } from "../services/api";
-import { Material as MaterialType } from "../types/material";
+import MaterialsList from "./MaterialsList";
+import UploadMaterial from "./UploadMaterial";
+import { userService, classService } from "../services/api";
 
 interface TeacherData {
   name: string;
@@ -97,8 +100,8 @@ type ClassInfo = {
 };
 
 const BASE = "http://localhost:3000";
-// Cambia este listado si tu backend usa otro path para "clases del docente"
-const CLASSES_LIST_URL = `${BASE}/classes/`;
+// Endpoint para obtener las clases del docente autenticado
+const CLASSES_LIST_URL = `${BASE}/classes/me`;
 
 // genera color estable por id
 function colorFromId(id: string): string {
@@ -139,6 +142,17 @@ export function TeacherDashboard({
   const [creatingClass, setCreatingClass] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+
+  // Añadir estudiantes
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [availableStudents, setAvailableStudents] = useState<ApiStudent[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [addStudentError, setAddStudentError] = useState<string | null>(null);
+  const [addStudentSuccess, setAddStudentSuccess] = useState<string | null>(
+    null,
+  );
 
   const headers = useMemo(
     () => ({
@@ -250,6 +264,90 @@ export function TeacherDashboard({
     };
   }, [headers, selectedClass?.id]);
 
+  // Cargar lista de estudiantes disponibles
+  async function loadAvailableStudents() {
+    try {
+      setLoadingStudents(true);
+      setAddStudentError(null);
+      const response = await userService.getAllStudents();
+      const studentsList = (response?.body ?? response ?? []) as ApiStudent[];
+      setAvailableStudents(studentsList);
+    } catch (e: any) {
+      console.error("Error cargando estudiantes:", e);
+      setAddStudentError("No se pudieron cargar los estudiantes.");
+      setAvailableStudents([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }
+
+  // Manejar apertura del modal
+  function handleOpenAddStudentModal() {
+    if (!selectedClass) {
+      alert("Selecciona una clase primero.");
+      return;
+    }
+    setShowAddStudentModal(true);
+    setSelectedStudentId("");
+    setAddStudentError(null);
+    setAddStudentSuccess(null);
+    loadAvailableStudents();
+  }
+
+  // Añadir estudiante a la clase
+  async function handleAddStudent() {
+    if (!selectedClass) {
+      setAddStudentError("No hay clase seleccionada.");
+      return;
+    }
+    if (!selectedStudentId) {
+      setAddStudentError("Selecciona un estudiante.");
+      return;
+    }
+
+    try {
+      setAddingStudent(true);
+      setAddStudentError(null);
+      setAddStudentSuccess(null);
+
+      await classService.addStudentToClass(
+        selectedClass.id,
+        Number(selectedStudentId),
+      );
+
+      setAddStudentSuccess("Estudiante añadido correctamente.");
+      setSelectedStudentId("");
+
+      // Recargar el detalle de la clase para actualizar la lista de estudiantes
+      try {
+        const resp = await fetch(`${BASE}/classes/${selectedClass.id}`, {
+          headers,
+        });
+        if (resp.ok) {
+          const json = await resp.json();
+          const body: ApiClassDetail = (json?.body ?? json) as ApiClassDetail;
+          setClassDetail(body);
+        }
+      } catch (e) {
+        console.error("Error recargando detalle de clase:", e);
+      }
+
+      // Cerrar modal después de 1.5 segundos
+      setTimeout(() => {
+        setShowAddStudentModal(false);
+      }, 1500);
+    } catch (err: any) {
+      console.error("Error añadiendo estudiante:", err);
+      setAddStudentError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo añadir el estudiante.",
+      );
+    } finally {
+      setAddingStudent(false);
+    }
+  }
+
   async function handleCreateClass(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
@@ -331,120 +429,6 @@ export function TeacherDashboard({
       setCreatingClass(false);
     }
   }
-
-  // ====== Materiales ======
-  const [materials, setMaterials] = useState<MaterialType[]>([]);
-  const [materialsLoading, setMaterialsLoading] = useState(false);
-  const [materialsError, setMaterialsError] = useState<string | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-
-  // Cargar materiales de la clase seleccionada
-  useEffect(() => {
-    let cancelled = false;
-    async function loadMaterials() {
-      if (!selectedClass) {
-        setMaterials([]);
-        return;
-      }
-      try {
-        setMaterialsLoading(true);
-        setMaterialsError(null);
-        const response = await materialService.getMaterialInfoFromClass(
-          selectedClass.id,
-        );
-        const list = Array.isArray(response)
-          ? response
-          : (response?.body ?? response?.data ?? []);
-        if (!cancelled) {
-          setMaterials(
-            list.map((m: any) => ({
-              id: m.id,
-              name: m.name || "Material sin nombre",
-              type: m.type || "unknown",
-              uploadDate: m.uploadDate || m.createdAt,
-              classId: selectedClass.id,
-              url: m.url,
-              size: m.size,
-              downloads: m.downloads || 0,
-            })),
-          );
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          console.error("Error cargando materiales:", e);
-          setMaterialsError("No se pudieron cargar los materiales.");
-          setMaterials([]);
-        }
-      } finally {
-        if (!cancelled) setMaterialsLoading(false);
-      }
-    }
-    loadMaterials();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedClass?.id]);
-
-  const handleFileUpload = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!uploadFile || !selectedClass) return;
-
-    setUploadingFile(true);
-    try {
-      const response = await materialService.uploadMaterialToClass(
-        selectedClass.id,
-        uploadFile,
-      );
-      console.log("Material subido:", response);
-
-      // Recargar materiales
-      const materialsResponse = await materialService.getMaterialInfoFromClass(
-        selectedClass.id,
-      );
-      const list = Array.isArray(materialsResponse)
-        ? materialsResponse
-        : (materialsResponse?.body ?? materialsResponse?.data ?? []);
-      setMaterials(
-        list.map((m: any) => ({
-          id: m.id,
-          name: m.name || "Material sin nombre",
-          type: m.type || "unknown",
-          uploadDate: m.uploadDate || m.createdAt,
-          classId: selectedClass.id,
-          url: m.url,
-          size: m.size,
-          downloads: m.downloads || 0,
-        })),
-      );
-
-      setUploadFile(null);
-      // Reset file input
-      const fileInput = document.getElementById(
-        "file-upload",
-      ) as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-    } catch (err: any) {
-      console.error("Error subiendo material:", err);
-      alert(
-        "Error al subir el archivo: " + (err.message || "Error desconocido"),
-      );
-    } finally {
-      setUploadingFile(false);
-    }
-  };
-
-  const getFileIcon = (type: Material["type"]) => {
-    switch (type) {
-      case "pdf":
-        return "📄";
-      case "ppt":
-        return "📊";
-      case "doc":
-        return "📝";
-      default:
-        return "📄";
-    }
-  };
 
   // === Datos derivados a partir del detalle (students) ===
   const students: ApiStudent[] = classDetail?.students ?? [];
@@ -636,15 +620,15 @@ export function TeacherDashboard({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Material Subido
+                    Clases Activas
                   </p>
-                  <p className="text-2xl font-bold">{materials.length}</p>
+                  <p className="text-2xl font-bold">{classes.length}</p>
                 </div>
                 <FileText className="h-8 w-8 text-blue-500" />
               </div>
               <div className="mt-2">
                 <Badge variant="secondary" className="text-xs">
-                  {materials.reduce((acc, m) => acc + m.downloads, 0)} descargas
+                  {classes.length} {classes.length === 1 ? "clase" : "clases"}
                 </Badge>
               </div>
             </CardContent>
@@ -672,12 +656,22 @@ export function TeacherDashboard({
           <TabsContent value="students">
             <Card className="bg-white/90 backdrop-blur">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  {selectedClass
-                    ? `Estudiantes — ${selectedClass.name} (ID: ${selectedClass.id})`
-                    : "Estudiantes — —"}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {selectedClass
+                      ? `Estudiantes — ${selectedClass.name} (ID: ${selectedClass.id})`
+                      : "Estudiantes — —"}
+                  </CardTitle>
+                  <Button
+                    onClick={handleOpenAddStudentModal}
+                    disabled={!selectedClass}
+                    className="flex items-center gap-2"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Añadir Estudiante
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {classDetailLoading ? (
@@ -792,169 +786,31 @@ export function TeacherDashboard({
             </Card>
           </TabsContent>
 
-          {/* Materials Tab (demo local) */}
+          {/* Materials Tab */}
           <TabsContent value="materials">
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Upload Form */}
+            {!selectedClass ? (
               <Card className="bg-white/90 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Upload className="h-5 w-5" />
-                    Subir Material
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleFileUpload} className="space-y-4">
-                    <div>
-                      <Label htmlFor="material-title">
-                        Título del Material
-                      </Label>
-                      <Input
-                        id="material-title"
-                        placeholder="Ej: Introducción al Cálculo"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="material-description">Descripción</Label>
-                      <Textarea
-                        id="material-description"
-                        placeholder="Breve descripción del contenido..."
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="material-class">Clase</Label>
-                      <Select
-                        value={selectedClass?.id}
-                        onValueChange={(value) => {
-                          const c = classes.find((x) => x.id === value);
-                          if (c) setSelectedClass(c);
-                        }}
-                        disabled={classesLoading || classes.length === 0}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona clase" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {classes.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: c.color }}
-                                />
-                                <span className="font-medium">
-                                  {c.name}{" "}
-                                  <span className="text-xs opacity-70">
-                                    (ID: {c.id})
-                                  </span>
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="file-upload">Archivo PDF</Label>
-                      <Input
-                        id="file-upload"
-                        type="file"
-                        accept=".pdf,application/pdf"
-                        required
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file && file.type === "application/pdf") {
-                            setUploadFile(file);
-                          } else if (file) {
-                            alert("Por favor selecciona solo archivos PDF");
-                            e.target.value = "";
-                            setUploadFile(null);
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Solo archivos PDF
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={uploadingFile || !selectedClass}
-                    >
-                      {uploadingFile ? "Subiendo..." : "Subir Material"}
-                    </Button>
-                  </form>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  Selecciona una clase para gestionar los materiales
                 </CardContent>
               </Card>
+            ) : (
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Upload Form */}
+                <UploadMaterial
+                  classId={selectedClass.id}
+                  onUploadSuccess={() => {
+                    // Trigger a refresh of the materials list
+                    // The MaterialsList component will reload automatically via its useEffect
+                  }}
+                />
 
-              {/* Materials List */}
-              <Card className="lg:col-span-2 bg-white/90 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Material Subido{" "}
-                      {selectedClass ? `— ${selectedClass.name}` : ""}
-                    </span>
-                    <Badge variant="secondary">
-                      {materials.length} archivos
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {materials.map((material) => (
-                      <div
-                        key={material.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/10 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">
-                            {getFileIcon(material.type)}
-                          </span>
-                          <div>
-                            <p className="font-medium">{material.name}</p>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>{selectedClass?.name || "Sin clase"}</span>
-                              <span>
-                                {material.uploadDate
-                                  ? new Date(
-                                      material.uploadDate,
-                                    ).toLocaleDateString()
-                                  : "—"}
-                              </span>
-                              <span>{material.size || "—"}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Download className="h-3 w-3" />
-                              {material.downloads}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Download className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {materials.length === 0 && (
-                      <div className="text-sm text-muted-foreground p-2">
-                        No hay materiales para esta clase.
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                {/* Materials List */}
+                <div className="lg:col-span-2">
+                  <MaterialsList classId={selectedClass.id} />
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* Analytics Tab (placeholders) */}
@@ -1001,6 +857,100 @@ export function TeacherDashboard({
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal para añadir estudiante */}
+      {showAddStudentModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-white">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Añadir Estudiante
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddStudentModal(false)}
+                  disabled={addingStudent}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="student-select">
+                    Selecciona un estudiante
+                  </Label>
+                  {loadingStudents ? (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Cargando estudiantes...
+                    </p>
+                  ) : (
+                    <Select
+                      value={selectedStudentId}
+                      onValueChange={setSelectedStudentId}
+                      disabled={addingStudent}
+                    >
+                      <SelectTrigger id="student-select" className="mt-2">
+                        <SelectValue placeholder="Selecciona un estudiante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableStudents.map((student) => (
+                          <SelectItem
+                            key={String(student.id)}
+                            value={String(student.id)}
+                          >
+                            {student.name} {student.lastname || ""} -{" "}
+                            {student.email}
+                          </SelectItem>
+                        ))}
+                        {availableStudents.length === 0 && (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No hay estudiantes disponibles
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                {addStudentError && (
+                  <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {addStudentError}
+                  </div>
+                )}
+
+                {addStudentSuccess && (
+                  <div className="p-3 rounded-lg border border-green-200 bg-green-50 text-green-800 text-sm flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    {addStudentSuccess}
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAddStudentModal(false)}
+                    disabled={addingStudent}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleAddStudent}
+                    disabled={addingStudent || !selectedStudentId}
+                  >
+                    {addingStudent ? "Añadiendo..." : "Añadir"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

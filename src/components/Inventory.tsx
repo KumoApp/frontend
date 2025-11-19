@@ -66,26 +66,67 @@ export function Inventory({ onBack, classId, petId }: InventoryProps) {
     try {
       setLoading(true);
       setError(null);
-      const response = await inventoryService.getOwnItemsInClass(classId);
-      console.log("Inventory loaded:", response);
 
-      const list = Array.isArray(response)
-        ? response
-        : (response?.body ?? response?.data ?? []);
+      // Cargar inventario y mascota en paralelo
+      const [inventoryResponse, petResponse] = await Promise.all([
+        inventoryService.getOwnItemsInClass(classId),
+        myPetId ? petsService.getPet(myPetId) : Promise.resolve(null),
+      ]);
+
+      console.log("[Inventory] ========== RAW RESPONSE ==========");
+      console.log("[Inventory] Inventory Response:", inventoryResponse);
+      console.log("[Inventory] Pet Response:", petResponse);
+
+      const list = Array.isArray(inventoryResponse)
+        ? inventoryResponse
+        : (inventoryResponse?.body ?? inventoryResponse?.data ?? []);
+
+      // Extraer IDs de items equipados de la mascota
+      const pet = petResponse?.body || petResponse?.data || petResponse;
+      const equippedItemIds = new Set<number>();
+
+      if (pet && pet.equippedItems && Array.isArray(pet.equippedItems)) {
+        // El backend devuelve un array de items equipados
+        pet.equippedItems.forEach((equippedItem: any) => {
+          if (equippedItem.id) {
+            equippedItemIds.add(Number(equippedItem.id));
+          }
+        });
+
+        console.log("[Inventory] Equipped items from pet:", pet.equippedItems);
+        console.log(
+          "[Inventory] Equipped item IDs:",
+          Array.from(equippedItemIds),
+        );
+      }
+
+      console.log("[Inventory] Items list:", list);
+      console.log("[Inventory] ====================================");
 
       setItems(
-        list.map((item: any) => ({
-          id: item.id,
-          itemId: item.itemId || item.id,
-          name: item.name || "Item sin nombre",
-          description: item.description,
-          type: item.type,
-          category: item.category,
-          imageUrl: item.imageUrl,
-          quantity: item.quantity ?? 1,
-          equipped: item.equipped ?? false,
-          acquiredDate: item.acquiredDate || item.createdAt,
-        })),
+        list.map((item: any) => {
+          const itemId = item.itemId || item.id;
+          const isEquipped = equippedItemIds.has(Number(itemId));
+
+          console.log(`[Inventory] Processing item ${item.name}:`, {
+            itemId,
+            isEquipped,
+            fromBackend: item.equipped,
+          });
+
+          return {
+            id: item.id,
+            itemId: itemId,
+            name: item.name || "Item sin nombre",
+            description: item.description,
+            type: item.type,
+            category: item.category,
+            imageUrl: item.imageUrl,
+            quantity: item.quantity ?? 1,
+            equipped: isEquipped,
+            acquiredDate: item.acquiredDate || item.createdAt,
+          };
+        }),
       );
     } catch (e: any) {
       console.error("Error cargando inventario:", e);
@@ -133,10 +174,19 @@ export function Inventory({ onBack, classId, petId }: InventoryProps) {
     setActionLoading(item.id);
 
     try {
-      // Llamar al endpoint con itemId null o 0 para desequipar
-      const response = await petsService.equipItem(myPetId, {
-        itemId: 0,
-      });
+      // Determinar el slotType basado en la categoría/tipo del item
+      let slotType = "ACCESSORY"; // Por defecto
+      const cat = (item.category || item.type || "").toUpperCase();
+
+      if (cat.includes("CLOTH") || cat.includes("ROPA")) {
+        slotType = "CLOTHING";
+      } else if (cat.includes("ACCESSORY") || cat.includes("ACCESORIO")) {
+        slotType = "ACCESSORY";
+      } else if (cat.includes("TOY") || cat.includes("JUGUETE")) {
+        slotType = "TOY";
+      }
+
+      const response = await petsService.unequipItem(myPetId, slotType);
       console.log("[Inventory] ✅ Item desequipado:", response);
       toast.success(`${item.name} desequipado`);
 
@@ -415,22 +465,38 @@ export function Inventory({ onBack, classId, petId }: InventoryProps) {
                             </div>
                             {/* Botones de acción */}
                             <div className="flex gap-2 mt-3">
-                              {isAccessory(item) && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="flex-1"
-                                  onClick={() => handleEquipItem(item)}
-                                  disabled={
-                                    actionLoading === item.id || !myPetId
-                                  }
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  {actionLoading === item.id
-                                    ? "Equipando..."
-                                    : "Equipar"}
-                                </Button>
-                              )}
+                              {isAccessory(item) &&
+                                (item.equipped ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => handleUnequipItem(item)}
+                                    disabled={
+                                      actionLoading === item.id || !myPetId
+                                    }
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    {actionLoading === item.id
+                                      ? "Desequipando..."
+                                      : "Desequipar"}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="flex-1"
+                                    onClick={() => handleEquipItem(item)}
+                                    disabled={
+                                      actionLoading === item.id || !myPetId
+                                    }
+                                  >
+                                    <Check className="h-3 w-3 mr-1" />
+                                    {actionLoading === item.id
+                                      ? "Equipando..."
+                                      : "Equipar"}
+                                  </Button>
+                                ))}
                               {isFood(item) && (
                                 <Button
                                   size="sm"
