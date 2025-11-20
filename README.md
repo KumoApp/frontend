@@ -1,5 +1,7 @@
 # 🐱 Kumo - Plataforma Educativa Gamificada
 
+[🌐 Ver la app desplegada](https://kumoapp.github.io/frontend/)
+
 Una plataforma educativa innovadora que transforma el aprendizaje en una experiencia interactiva y divertida mediante la gamificación con mascotas virtuales.
 
 ## ✨ Características Principales
