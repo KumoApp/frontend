@@ -17,16 +17,6 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("auth_token");
-    console.log(
-      "[API Interceptor] Token from localStorage:",
-      token ? `${token.substring(0, 20)}...` : "NO TOKEN",
-    );
-    console.log("[API Interceptor] Request URL:", config.url);
-    console.log("[API Interceptor] Request method:", config.method);
-    console.log(
-      "[API Interceptor] Request data type:",
-      config.data?.constructor?.name,
-    );
 
     // Configurar headers
     config.headers = config.headers ?? {};
@@ -34,30 +24,15 @@ apiClient.interceptors.request.use(
     // Agregar token si existe
     if (token) {
       (config.headers as any).Authorization = `Bearer ${token}`;
-      console.log(
-        "[API Interceptor] Authorization header set to:",
-        `Bearer ${token.substring(0, 20)}...`,
-      );
-    } else {
-      console.warn("[API Interceptor] No token found in localStorage!");
     }
 
     // Solo agregar Content-Type: application/json si NO es FormData
     if (config.data && !(config.data instanceof FormData)) {
       (config.headers as any)["Content-Type"] = "application/json";
-      console.log("[API Interceptor] Content-Type set to: application/json");
     } else if (config.data instanceof FormData) {
       // Eliminar Content-Type para que el navegador lo configure con el boundary
       delete (config.headers as any)["Content-Type"];
-      console.log(
-        "[API Interceptor] FormData detected - Content-Type will be set by browser",
-      );
     }
-
-    console.log(
-      "[API Interceptor] Final headers:",
-      JSON.stringify(config.headers),
-    );
 
     return config;
   },
@@ -265,6 +240,7 @@ export interface AnswerDailyQuizResponse {
   correct: boolean[]; // Array of booleans indicating if each answer was correct
   score: number;
   total: number;
+  coinsEarned: number; // Monedas ganadas por completar el quiz
 }
 
 export const quizService = {
@@ -367,6 +343,37 @@ export const quizService = {
     const data = response.data;
     // Manejar respuesta directa o envuelta
     return data?.body || data?.data || data;
+  },
+
+  // PATCH /quizzes/classes/:classId/daily/enable - EnableAutomaticDailyQuiz
+  async enableAutomaticDailyQuiz(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] PATCH /quizzes/classes/${id}/daily/enable`);
+    const response = await apiClient.patch<any>(
+      `/quizzes/classes/${id}/daily/enable`,
+    );
+    console.log(`[QuizService] Response:`, response.data);
+    return response.data;
+  },
+
+  // PATCH /quizzes/classes/:classId/daily/disable - DisableAutomaticDailyQuiz
+  async disableAutomaticDailyQuiz(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] PATCH /quizzes/classes/${id}/daily/disable`);
+    const response = await apiClient.patch<any>(
+      `/quizzes/classes/${id}/daily/disable`,
+    );
+    console.log(`[QuizService] Response:`, response.data);
+    return response.data;
+  },
+
+  // POST /quizzes/classes/:classId - CreateDailyQuiz
+  async createDailyQuiz(classId: string | number): Promise<any> {
+    const id = encodeURIComponent(String(classId));
+    console.log(`[QuizService] POST /quizzes/classes/${id}`);
+    const response = await apiClient.post<any>(`/quizzes/classes/${id}/daily`);
+    console.log(`[QuizService] Response:`, response.data);
+    return response.data;
   },
 };
 
@@ -518,10 +525,10 @@ export const shopService = {
     formData.append("image", imageFile);
     formData.append("name", itemData.name);
     formData.append("price", itemData.price.toString());
-    formData.append("type", itemData.type); // type es obligatorio
+    formData.append("type", itemData.type.toUpperCase()); // Asegurar mayúsculas
 
     // Campos opcionales
-    if (itemData.description) {
+    if (itemData.description && itemData.description.trim()) {
       formData.append("description", itemData.description);
     }
 
@@ -535,7 +542,13 @@ export const shopService = {
     );
     console.log(`[ShopService] FormData entries:`);
     for (let pair of formData.entries()) {
-      console.log(`  ${pair[0]}:`, pair[1]);
+      if (pair[1] instanceof File) {
+        console.log(
+          `  ${pair[0]}: [File] ${pair[1].name} (${pair[1].type}, ${pair[1].size} bytes)`,
+        );
+      } else {
+        console.log(`  ${pair[0]}: "${pair[1]}" (type: ${typeof pair[1]})`);
+      }
     }
     console.log(`[ShopService] About to send request...`);
 
@@ -544,18 +557,32 @@ export const shopService = {
       systemToken?.substring(0, 30),
     );
 
-    // No especificar Content-Type para que el navegador lo configure automáticamente
-    // con el boundary correcto para multipart/form-data
-    const response = await apiClient.post<any>("/shop/items", formData, {
-      headers: {
-        Authorization: `Bearer ${systemToken}`,
-      },
-    });
-    console.log(`[ShopService] ========== RESPONSE RECEIVED ==========`);
-    console.log(`[ShopService] Status:`, response.status);
-    console.log(`[ShopService] Response data:`, response.data);
-    console.log(`[ShopService] ======================================`);
-    return response.data;
+    try {
+      // No especificar Content-Type para que el navegador lo configure automáticamente
+      // con el boundary correcto para multipart/form-data
+      const response = await apiClient.post<any>("/shop/items", formData, {
+        headers: {
+          Authorization: `Bearer ${systemToken}`,
+        },
+      });
+      console.log(`[ShopService] ========== RESPONSE RECEIVED ==========`);
+      console.log(`[ShopService] Status:`, response.status);
+      console.log(`[ShopService] Response data:`, response.data);
+      console.log(`[ShopService] ======================================`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`[ShopService] ========== ERROR ==========`);
+      console.error(`[ShopService] Error message:`, error?.message);
+      console.error(`[ShopService] Response status:`, error?.response?.status);
+      console.error(`[ShopService] Response data:`, error?.response?.data);
+      console.error(
+        `[ShopService] Response headers:`,
+        error?.response?.headers,
+      );
+      console.error(`[ShopService] Request headers:`, error?.config?.headers);
+      console.error(`[ShopService] ======================================`);
+      throw error;
+    }
   },
 };
 

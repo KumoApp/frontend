@@ -269,32 +269,20 @@ export function StudentDashboard({
   const streakMultiplier = studentData.streak >= 3 ? 1.25 : 1;
 
   const handleQuizComplete = async (score: number) => {
-    const baseReward = 100;
-    const reward = Math.floor(baseReward * (score / 100) * streakMultiplier);
-
-    // Actualizar localmente primero
-    setStudentData((prev) => ({
-      ...prev,
-      kumoSoles: prev.kumoSoles + reward,
-      streak: prev.streak + 1,
-    }));
-
-    // Recargar datos del backend después de un pequeño delay
+    // Recargar datos del backend para obtener los valores actualizados
     if (selectedClass) {
-      setTimeout(async () => {
-        try {
-          const response = await userService.getMyDataInClass(selectedClass.id);
-          const data: UserInClassData = response.body || response;
-          setStudentData((prev) => ({
-            ...prev,
-            kumoSoles: data.coins || prev.kumoSoles,
-            streak: data.streak || prev.streak,
-            level: data.level || prev.level,
-          }));
-        } catch (e) {
-          console.error("Error recargando datos después del quiz:", e);
-        }
-      }, 1000);
+      try {
+        const response = await userService.getMyDataInClass(selectedClass.id);
+        const data: UserInClassData = response.body || response;
+        setStudentData((prev) => ({
+          ...prev,
+          kumoSoles: data.coins,
+          streak: data.streak,
+          level: data.level,
+        }));
+      } catch (e) {
+        console.error("Error recargando datos después del quiz:", e);
+      }
     }
   };
 
@@ -700,7 +688,6 @@ export function StudentDashboard({
             <span>Mascotas del Salón</span>
           </Button>
         </div>
-
 
         {/* Modal del Quiz Diario (pasa classId desde el selector superior) */}
         {activeView === "quiz" && selectedClass && (

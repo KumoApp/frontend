@@ -46,7 +46,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import MaterialsList from "./MaterialsList";
 import UploadMaterial from "./UploadMaterial";
-import { userService, classService } from "../services/api";
+import { userService, classService, quizService } from "../services/api";
 
 interface TeacherData {
   name: string;
@@ -153,6 +153,17 @@ export function TeacherDashboard({
   const [addStudentSuccess, setAddStudentSuccess] = useState<string | null>(
     null,
   );
+
+  // Gestión de quizzes diarios
+  const [enablingAutoQuiz, setEnablingAutoQuiz] = useState(false);
+  const [disablingAutoQuiz, setDisablingAutoQuiz] = useState(false);
+  const [creatingDailyQuiz, setCreatingDailyQuiz] = useState(false);
+  const [quizManagementError, setQuizManagementError] = useState<string | null>(
+    null,
+  );
+  const [quizManagementSuccess, setQuizManagementSuccess] = useState<
+    string | null
+  >(null);
 
   const headers = useMemo(
     () => ({
@@ -345,6 +356,112 @@ export function TeacherDashboard({
       );
     } finally {
       setAddingStudent(false);
+    }
+  }
+
+  // Funciones para gestión de quizzes diarios
+  async function handleEnableAutomaticDailyQuiz() {
+    if (!selectedClass) {
+      setQuizManagementError("No hay clase seleccionada.");
+      return;
+    }
+
+    if (enablingAutoQuiz) {
+      console.log("[Quiz] Ya hay una habilitación en progreso, ignorando...");
+      return;
+    }
+
+    try {
+      setEnablingAutoQuiz(true);
+      setQuizManagementError(null);
+      setQuizManagementSuccess(null);
+
+      console.log(
+        "[Quiz] Habilitando quiz automático para clase:",
+        selectedClass.id,
+      );
+      await quizService.enableAutomaticDailyQuiz(selectedClass.id);
+      setQuizManagementSuccess(
+        "Quiz diario automático habilitado correctamente.",
+      );
+    } catch (err: any) {
+      console.error("Error habilitando quiz automático:", err);
+      setQuizManagementError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo habilitar el quiz automático.",
+      );
+    } finally {
+      setEnablingAutoQuiz(false);
+    }
+  }
+
+  async function handleDisableAutomaticDailyQuiz() {
+    if (!selectedClass) {
+      setQuizManagementError("No hay clase seleccionada.");
+      return;
+    }
+
+    if (disablingAutoQuiz) {
+      console.log(
+        "[Quiz] Ya hay una deshabilitación en progreso, ignorando...",
+      );
+      return;
+    }
+
+    try {
+      setDisablingAutoQuiz(true);
+      setQuizManagementError(null);
+      setQuizManagementSuccess(null);
+
+      console.log(
+        "[Quiz] Deshabilitando quiz automático para clase:",
+        selectedClass.id,
+      );
+      await quizService.disableAutomaticDailyQuiz(selectedClass.id);
+      setQuizManagementSuccess(
+        "Quiz diario automático deshabilitado correctamente.",
+      );
+    } catch (err: any) {
+      console.error("Error deshabilitando quiz automático:", err);
+      setQuizManagementError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo deshabilitar el quiz automático.",
+      );
+    } finally {
+      setDisablingAutoQuiz(false);
+    }
+  }
+
+  async function handleCreateDailyQuiz() {
+    if (!selectedClass) {
+      setQuizManagementError("No hay clase seleccionada.");
+      return;
+    }
+
+    if (creatingDailyQuiz) {
+      console.log("[Quiz] Ya hay una creación en progreso, ignorando...");
+      return;
+    }
+
+    try {
+      setCreatingDailyQuiz(true);
+      setQuizManagementError(null);
+      setQuizManagementSuccess(null);
+
+      console.log("[Quiz] Creando quiz diario para clase:", selectedClass.id);
+      await quizService.createDailyQuiz(selectedClass.id);
+      setQuizManagementSuccess("Quiz diario creado correctamente.");
+    } catch (err: any) {
+      console.error("Error creando quiz diario:", err);
+      setQuizManagementError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo crear el quiz diario.",
+      );
+    } finally {
+      setCreatingDailyQuiz(false);
     }
   }
 
@@ -588,6 +705,95 @@ export function TeacherDashboard({
             </form>
           </CardContent>
         </Card>
+
+        {/* Gestión de Quizzes Diarios */}
+        <Card className="bg-white/90 backdrop-blur mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Gestión de Quizzes Diarios
+              {selectedClass && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  — {selectedClass.name}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Mensajes de error/éxito */}
+              {quizManagementError && (
+                <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm">{quizManagementError}</span>
+                </div>
+              )}
+              {quizManagementSuccess && (
+                <div className="p-3 rounded-lg border border-green-200 bg-green-50 text-green-800 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">{quizManagementSuccess}</span>
+                </div>
+              )}
+
+              {/* Botones de acción */}
+              <div className="grid md:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-sm mb-2 block">
+                    Quiz Automático Diario
+                  </Label>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleEnableAutomaticDailyQuiz}
+                      disabled={!selectedClass || enablingAutoQuiz}
+                      variant="default"
+                      className="flex-1"
+                    >
+                      {enablingAutoQuiz ? "Habilitando…" : "Habilitar"}
+                    </Button>
+                    <Button
+                      onClick={handleDisableAutomaticDailyQuiz}
+                      disabled={!selectedClass || disablingAutoQuiz}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {disablingAutoQuiz ? "Deshabilitando…" : "Deshabilitar"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Activa/desactiva la generación automática de quizzes
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-sm mb-2 block">
+                    Crear Quiz Manual
+                  </Label>
+                  <Button
+                    onClick={handleCreateDailyQuiz}
+                    disabled={!selectedClass || creatingDailyQuiz}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    {creatingDailyQuiz ? "Creando…" : "Crear Quiz Ahora"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Crea un nuevo quiz diario manualmente
+                  </p>
+                </div>
+
+                <div className="flex items-end">
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 w-full">
+                    <p className="text-xs text-blue-800">
+                      <strong>Nota:</strong> Selecciona una clase primero para
+                      gestionar sus quizzes diarios. Debes subir material de clase para que se pueda generar el quizz diario.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Banner de error si falla /classes/{id} */}
         {classDetailError && (
           <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 flex items-center gap-2">

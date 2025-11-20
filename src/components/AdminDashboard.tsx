@@ -37,13 +37,14 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type Role = "student" | "teacher" | "admin";
+type Role = "student" | "teacher" | "admin" | "unknown";
 
 interface User {
   id: number | string;
   username: string;
   email: string;
   name: string;
+  lastname?: string;
   role: Role;
 }
 
@@ -97,7 +98,12 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
           headers: { Authorization: `Bearer ${token}` },
         });
         const usersJson = await usersResponse.json();
-        const usersList: User[] = usersJson?.body ?? usersJson ?? [];
+        const rawUsers = usersJson?.body ?? usersJson ?? [];
+        // Mapear el rol del backend (mayúsculas) al formato del frontend (minúsculas)
+        const usersList: User[] = rawUsers.map((u: any) => ({
+          ...u,
+          role: u.role?.toLowerCase() || "unknown",
+        }));
         if (!cancelled) setUsers(usersList);
 
         // Cargar solo estudiantes para el selector de asignación
@@ -159,8 +165,18 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
             Administrador
           </Badge>
         );
+      case "unknown":
+        return (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            Sistema
+          </Badge>
+        );
       default:
-        return null;
+        return (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            {role}
+          </Badge>
+        );
     }
   };
 
@@ -172,6 +188,8 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
         return <BookOpen className="h-4 w-4 text-green-500" />;
       case "admin":
         return <Shield className="h-4 w-4 text-purple-500" />;
+      case "unknown":
+        return <Users className="h-4 w-4 text-gray-500" />;
       default:
         return null;
     }
@@ -459,6 +477,7 @@ export function AdminDashboard({ adminData, onLogout }: AdminDashboardProps) {
                       <TableHead>Usuario</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Nombre</TableHead>
+                      <TableHead>Rol</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
