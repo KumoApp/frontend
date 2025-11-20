@@ -103,7 +103,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
           <CardHeader className="space-y-4">
             <div className="text-center">
               <div className="inline-flex items-center justify-center mb-4">
-                <img src={kumo_logo} alt="Kumo Logo" className="h-12 w-auto" />
+                <img src ={kumo_logo} alt = "logo"/>
               </div>
               <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
               <p className="text-gray-600 mt-2">Accede a tu cuenta de Kumo</p>
