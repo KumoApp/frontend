@@ -9,7 +9,7 @@ import {
   InvalidCredentialsError,
   TokenInvalidError,
 } from "../contexts/AuthContext";
-import kumoLogo from "../assets/kumo_logo.svg";
+import kumo_logo from '../assets/kumo_logo.svg';
 
 interface LoginFormProps {
   onBack: () => void;
@@ -103,7 +103,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
           <CardHeader className="space-y-4">
             <div className="text-center">
               <div className="inline-flex items-center justify-center mb-4">
-                <img src={kumoLogo} alt="Kumo Logo" className="h-12 w-auto" />
+                <img src={kumo_logo} alt="Kumo Logo" className="h-12 w-auto" />
               </div>
               <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
               <p className="text-gray-600 mt-2">Accede a tu cuenta de Kumo</p>
