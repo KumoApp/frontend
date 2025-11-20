@@ -48,7 +48,7 @@ interface User {
   role: Role;
 }
 
-const BASE_URL = "http://ena.ddns.net:62483";
+const BASE_URL = "https://kumoapp.duckdns.org:62483";
 const USERS_URL = `${BASE_URL}/users`;
 const STUDENTS_URL = `${BASE_URL}/users/students`;
 

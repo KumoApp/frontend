@@ -56,7 +56,7 @@ interface ChatBotProps {
   onClassChange: (classInfo: ClassInfo) => void;
 }
 
-const BASE = 'http://ena.ddns.net:62483';
+const BASE = 'https://kumoapp.duckdns.org:62483';
 const CONVERSATIONS_BASE = BASE;
 
 function isLikelyJSON(text: string): any | null {

@@ -1,6 +1,6 @@
 import React from "react";
 
-const API_BASE_URL = "http://ena.ddns.net:62483";
+const API_BASE_URL = "https://kumoapp.duckdns.org:62483";
 
 interface EquippedItem {
   id: string | number;

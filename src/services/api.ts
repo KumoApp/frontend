@@ -6,7 +6,7 @@ import {
   CheckTokenResponse,
 } from "../types/auth";
 
-const API_BASE_URL = "http://ena.ddns.net:62483";
+const API_BASE_URL = "https://kumoapp.duckdns.org:62483";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
