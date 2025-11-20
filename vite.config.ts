@@ -4,6 +4,10 @@
   import path from 'path';
 
   export default defineConfig({
+    base: '/frontend/',
+    build:{
+      outDir: 'docs',
+    },
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
