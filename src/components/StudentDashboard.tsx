@@ -56,7 +56,7 @@ interface StudentDashboardProps {
   };
 }
 
-const BASE = "http://localhost:3000";
+const BASE = "http://ena.ddns.net:62483";
 
 // genera color estable por id
 function colorFromId(id: string): string {

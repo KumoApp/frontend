@@ -1,7 +1,6 @@
 import React from "react";
 
-const API_BASE_URL =
-  (import.meta as any).env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const API_BASE_URL = "http://ena.ddns.net:62483";
 
 interface EquippedItem {
   id: string | number;

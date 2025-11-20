@@ -99,7 +99,7 @@ type ClassInfo = {
   color: string;
 };
 
-const BASE = "http://localhost:3000";
+const BASE = "http://ena.ddns.net:62483";
 // Endpoint para obtener las clases del docente autenticado
 const CLASSES_LIST_URL = `${BASE}/classes/me`;
 
