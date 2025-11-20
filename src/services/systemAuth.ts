@@ -1,11 +1,6 @@
 import { authService, shopService, CreateShopItemRequest } from "./api";
 
 // Credenciales del sistema desde variables de entorno o constantes
-export const SYSTEM_CREDENTIALS = {
-  email: "system@kumoapp.com",
-  username: "system",
-  password: "shupa",
-};
 
 /**
  * Autentica con el usuario del sistema y retorna el token
