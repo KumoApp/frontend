@@ -1,6 +1,6 @@
 {
       "name": "Kumo",
-      "homapge": "https://kumoapp.github.io/frontend/"
+      "homepage": "https://kumoapp.github.io/frontend/",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
