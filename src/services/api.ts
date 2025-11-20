@@ -7,7 +7,7 @@ import {
 } from "../types/auth";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+  (import.meta as any).env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
