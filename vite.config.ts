@@ -3,7 +3,7 @@
   import path from 'path';
 
   export default defineConfig({
-    base: '/KumoApp/frontend/',
+    base: '/frontend',
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
