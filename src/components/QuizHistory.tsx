@@ -26,11 +26,15 @@ interface QuizHistoryProps {
   studentName?: string;
 }
 
-// Using types from API service
+// Using types from API service - extendido con datos completos para calcular correctas
 type OwnAnswerItem = QuizAnswerSmallResponse & {
   timeSpent?: number;
   kumoSolesEarned?: number;
   streakBonus?: boolean;
+  // Campos adicionales para calcular correctas localmente
+  answers?: number[];
+  correctAnswers?: number[];
+  calculatedCorrect?: number; // Número de correctas calculado localmente
 };
 
 export function QuizHistory({
@@ -103,7 +107,36 @@ export function QuizHistory({
           const safeAnswersList = Array.isArray(answersList) ? answersList : [];
           if (!cancelled) {
             const map: Record<string, OwnAnswerItem> = {};
-            for (const m of safeAnswersList) {
+
+            // Para cada respuesta, obtener el detalle completo para calcular correctas
+            const detailPromises = safeAnswersList.map(async (m) => {
+              try {
+                const fullAnswer = await quizService.getOwnAnswer(m.quizId);
+                // Calcular número de correctas comparando answers con correctAnswers
+                let calculatedCorrect = 0;
+                if (fullAnswer.answers && fullAnswer.correctAnswers) {
+                  for (let i = 0; i < fullAnswer.answers.length; i++) {
+                    if (
+                      fullAnswer.answers[i] === fullAnswer.correctAnswers[i]
+                    ) {
+                      calculatedCorrect++;
+                    }
+                  }
+                }
+                return {
+                  ...m,
+                  answers: fullAnswer.answers,
+                  correctAnswers: fullAnswer.correctAnswers,
+                  calculatedCorrect,
+                };
+              } catch (e) {
+                // Si falla obtener el detalle, usar los datos básicos
+                return m;
+              }
+            });
+
+            const detailedAnswers = await Promise.all(detailPromises);
+            for (const m of detailedAnswers) {
               map[String(m.quizId)] = m;
             }
             setOwnAnswersMap(map);
@@ -377,8 +410,15 @@ export function QuizHistory({
             <div className="space-y-3">
               {safeQuizzes.map((q) => {
                 const mine = ownAnswersMap[String(q.id)];
-                const s10 = scoreToTen(mine?.score);
-                const scoreBadge = getScoreBadge(s10);
+                // Calcular correctas localmente
+                const correctas =
+                  mine?.calculatedCorrect ?? mine?.score ?? null;
+                const totalPreguntas = mine?.total ?? q.totalQuestions;
+                const scoreBadge = getScoreBadge(
+                  correctas != null && totalPreguntas
+                    ? Math.round((correctas / totalPreguntas) * 10)
+                    : null,
+                );
                 const dateTxt = q.date
                   ? new Date(q.date).toLocaleDateString("es-ES", {
                       day: "numeric",
@@ -394,7 +434,9 @@ export function QuizHistory({
                     <div className="flex items-center gap-4 flex-1">
                       <div className="flex flex-col items-center justify-center w-16">
                         <span className="text-2xl font-bold text-primary">
-                          {s10 != null ? `${s10}/10` : "—"}
+                          {correctas != null
+                            ? `${correctas}/${totalPreguntas}`
+                            : "—"}
                         </span>
                         <Badge
                           className={scoreBadge.className}
@@ -420,14 +462,25 @@ export function QuizHistory({
                             <Calendar className="h-3 w-3" /> {dateTxt}
                           </span>
                           <span className="flex items-center gap-1">
-                            {mine?.score != null && mine?.total != null ? (
+                            {mine ? (
                               <>
-                                {mine.score === mine.total ? (
-                                  <CheckCircle className="h-3 w-3 text-green-500" />
-                                ) : (
-                                  <XCircle className="h-3 w-3 text-gray-400" />
-                                )}
-                                {mine.score}/{mine.total} correctas
+                                {/* Usar calculatedCorrect (calculado localmente) o score como fallback */}
+                                {(() => {
+                                  const correctas =
+                                    mine.calculatedCorrect ?? mine.score ?? 0;
+                                  const totalPreguntas =
+                                    mine.total ?? q.totalQuestions;
+                                  return (
+                                    <>
+                                      {correctas === totalPreguntas ? (
+                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                      ) : (
+                                        <XCircle className="h-3 w-3 text-gray-400" />
+                                      )}
+                                      {correctas}/{totalPreguntas} correctas
+                                    </>
+                                  );
+                                })()}
                               </>
                             ) : (
                               "—"
@@ -519,12 +572,31 @@ export function QuizHistory({
                           "—"}
                       </div>
                       {(() => {
-                        const s10 = scoreToTen(detailOwn?.score);
-                        return s10 != null ? (
+                        if (!detailOwn) return null;
+                        // Calcular correctas localmente comparando answers con correctAnswers
+                        let correctas = 0;
+                        const totalPreguntas =
+                          detailOwn.correctAnswers?.length ??
+                          detailQuiz.totalQuestions ??
+                          0;
+                        if (detailOwn.answers && detailOwn.correctAnswers) {
+                          for (let i = 0; i < detailOwn.answers.length; i++) {
+                            if (
+                              detailOwn.answers[i] ===
+                              detailOwn.correctAnswers[i]
+                            ) {
+                              correctas++;
+                            }
+                          }
+                        }
+                        return (
                           <div className="mt-1">
-                            Tu puntaje: <b>{s10}/10</b>
+                            Tu puntaje:{" "}
+                            <b>
+                              {correctas}/{totalPreguntas} correctas
+                            </b>
                           </div>
-                        ) : null;
+                        );
                       })()}
                     </div>
 
